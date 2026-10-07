@@ -1,0 +1,9 @@
+{
+  "name": "Aerovex Filtration ERP",
+  "short_name": "Aerovex ERP",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f8",
+  "theme_color": "#0b4961",
+  "description": "Aerovex Filtration Business and Production ERP"
+}
