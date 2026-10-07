@@ -44,3 +44,72 @@ function amountForm(title,key){show(title,'<form class="form" onsubmit="event.pr
 function plantHead(){let tasks=['Attendance & Manpower Check','Pending / Urgent Work Orders Check','Work Order Label dena','Cutting Plan + SRL / Cloth Issue','Production Floor Round','Quality / Measurement Check','Store & Material Shortage Check','Target vs Actual Production','Packing / Dispatch Readiness','ERP Entries Verify','Tomorrow Priority'];show('Plant Head – Today Work List','<div>'+tasks.map((x,i)=>'<p><label><input type="checkbox"> '+(i+1)+'. '+x+'</label></p>').join('')+'<button class="primary" onclick="window.print()">Print</button></div>')}
 document.querySelector('#menu').onclick=()=>show('Aerovex ERP','<div class="tiles">'+[...modules.production,...modules.accounts,...modules.masters].map(x=>'<div class="tile" onclick="closeModal();openModule(\''+x[0]+'\')"><b>'+x[0]+'</b><small>'+x[1]+'</small></div>').join('')+'</div>');
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));render();
+
+/* AEROVEX TALLY STYLE ACCOUNTING EXTENSION */
+if(!db.vouchers)db.vouchers=[];if(!db.purchaseOrders)db.purchaseOrders=[];
+if(!modules.accounts.some(function(x){return x[0]==='Purchase Order'}))modules.accounts.splice(4,0,['Purchase Order','Supplier PO']);
+modules.accounts.push(['Voucher Register','Sales • Purchase • Receipt • Payment'],['GST Summary','Output GST • Input GST']);
+function n(v){return Number(v||0)}
+function tday(){return new Date().toISOString().slice(0,10)}
+function vno(p,a){return p+'/'+String(a.length+1).padStart(4,'0')}
+function postV(t,no,d,p,dr,cr,nar){db.vouchers.push({type:t,no:no,date:d,party:p,debit:n(dr),credit:n(cr),narration:nar||''})}
+function openModule(name){
+ if(name==='New Work Order'||name==='Work Orders')return workForm();
+ if(name==='Party Master')return masterForm('Party Master','parties',['Party Name','GSTIN','Phone','Email']);
+ if(name==='Supplier Master')return masterForm('Supplier Master','suppliers',['Supplier Name','GSTIN','Phone','Email']);
+ if(name==='Product Master')return productForm();
+ if(name==='Store / SRL'||name==='Store / SRL Entry')return storeForm();
+ if(name==='Production Entry'||['Cutting','Stitching','Thread Cutting','Gun Finishing','Packing'].includes(name))return productionForm(name==='Production Entry'?'':name);
+ if(name==='Quotation'||name==='New Quotation')return docForm('Quotation','quotations');
+ if(name==='Sales Order / PO')return docForm('Sales Order / PO','salesOrders');
+ if(name==='Delivery Challan')return docForm('Delivery Challan','challans');
+ if(name==='Purchase Order')return docForm('Purchase Order','purchaseOrders');
+ if(name==='Sales Invoice')return invoiceForm();
+ if(name==='Purchase')return purchaseForm();
+ if(name==='Receipt')return tallyAmount('Receipt','receipts');
+ if(name==='Payment')return tallyAmount('Payment','payments');
+ if(name==='Expenses')return tallyAmount('Expense','expenses');
+ if(name==='Party Ledger')return ledgerView();
+ if(name==='Outstanding')return outstandingView();
+ if(name==='Cash / Bank')return cashView();
+ if(name==='Profit Report')return profitView();
+ if(name==='Voucher Register')return voucherView();
+ if(name==='GST Summary')return gstView();
+ if(name==='Plant Head Work List')return plantHead();
+ const arr=[...modules.production,...modules.accounts,...modules.masters].find(function(x){return x[0]===name});
+ show(name,'<div class="empty">'+(arr?arr[1]:'Module')+'<br><br>ZERO DATA</div>')
+}
+function invoiceForm(){
+ var no=vno('AFX/INV',db.invoices);
+ show('Sales Invoice – Tally Style','<form id="inv" class="form" onsubmit="event.preventDefault();saveInvoice(this)">'+
+ '<label>Invoice No.<input name="invoiceNo" value="'+no+'" readonly></label><label>Date<input name="date" type="date" value="'+tday()+'"></label>'+
+ '<label>Party Name<input name="party" required></label><label>GSTIN<input name="gstin"></label>'+
+ '<label>Place of Supply<input name="place" value="Gujarat"></label><label>GST Type<select name="taxType"><option>CGST + SGST</option><option>IGST</option><option>Exempt</option></select></label>'+
+ '<label class="full">Item / Description<input name="description" required></label><label>HSN/SAC<input name="hsn"></label>'+
+ '<label>Qty<input name="qty" type="number" step=".01" value="1" required></label><label>Rate<input name="rate" type="number" step=".01" required></label>'+
+ '<label>GST %<input name="gstPercent" type="number" step=".01" value="18"></label><label>Freight / Other<input name="other" type="number" step=".01" value="0"></label>'+
+ '<label>Round Off<input name="round" type="number" step=".01" value="0"></label><label>PO / Reference<input name="ref"></label>'+
+ '<label class="full">Narration<input name="narration"></label><div class="full"><button class="primary">Save & Post Sales Voucher</button></div></form>')
+}
+function saveInvoice(form){var o=Object.fromEntries(new FormData(form));o.qty=n(o.qty);o.rate=n(o.rate);o.taxable=o.qty*o.rate;o.gst=o.taxable*n(o.gstPercent)/100;o.total=o.taxable+o.gst+n(o.other)+n(o.round);db.invoices.push(o);postV('Sales',o.invoiceNo,o.date,o.party,o.total,0,o.narration);save();closeModal();render()}
+function purchaseForm(){
+ var no=vno('AFX/PUR',db.purchases);
+ show('Purchase Invoice – Tally Style','<form class="form" onsubmit="event.preventDefault();savePurchase(this)">'+
+ '<label>Purchase No.<input name="invoiceNo" value="'+no+'" readonly></label><label>Date<input name="date" type="date" value="'+tday()+'"></label>'+
+ '<label>Supplier<input name="party" required></label><label>Supplier Invoice No.<input name="supplierInvoice"></label>'+
+ '<label>GSTIN<input name="gstin"></label><label>Item / Description<input name="description" required></label>'+
+ '<label>HSN/SAC<input name="hsn"></label><label>Qty<input name="qty" type="number" step=".01" value="1"></label>'+
+ '<label>Rate<input name="rate" type="number" step=".01"></label><label>GST %<input name="gstPercent" type="number" step=".01" value="18"></label>'+
+ '<label class="full">Narration<input name="narration"></label><div class="full"><button class="primary">Save & Post Purchase Voucher</button></div></form>')
+}
+function savePurchase(form){var o=Object.fromEntries(new FormData(form));o.qty=n(o.qty);o.rate=n(o.rate);o.taxable=o.qty*o.rate;o.gst=o.taxable*n(o.gstPercent)/100;o.total=o.taxable+o.gst;db.purchases.push(o);postV('Purchase',o.invoiceNo,o.date,o.party,0,o.total,o.narration);save();closeModal();render()}
+function tallyAmount(title,key){show(title+' Voucher','<form class="form" onsubmit="event.preventDefault();saveAmt(\\''+title+'\\',\\''+key+'\\',this)"><label>Voucher No.<input name="no" value="'+vno('AFX/'+title.slice(0,3).toUpperCase(),db[key])+'" readonly></label><label>Date<input name="date" type="date" value="'+tday()+'"></label><label>Party / Ledger<input name="party" required></label><label>Amount<input name="amount" type="number" step=".01" required></label><label>Mode<select name="mode"><option>Bank</option><option>Cash</option><option>UPI</option></select></label><label>Reference<input name="ref"></label><label class="full">Narration<input name="remark"></label><div class="full"><button class="primary">Save Voucher</button></div></form>')}
+function saveAmt(title,key,form){var o=Object.fromEntries(new FormData(form));o.amount=n(o.amount);db[key].push(o);var rec=title==='Receipt';postV(title,o.no,o.date,o.party,rec?0:o.amount,rec?o.amount:0,o.remark);save();closeModal();render()}
+function tbl(h,r){return '<div class="reportWrap"><table class="report"><thead><tr>'+h.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.map(function(a){return '<tr>'+a.map(function(x){return '<td>'+x+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'}
+function ledgerView(){var ps=[...new Set(db.invoices.map(x=>x.party).concat(db.receipts.map(x=>x.party),db.purchases.map(x=>x.party),db.payments.map(x=>x.party)).filter(Boolean))],r=ps.map(function(p){var dr=db.invoices.filter(x=>x.party===p).reduce((a,x)=>a+n(x.total),0)+db.payments.filter(x=>x.party===p).reduce((a,x)=>a+n(x.amount),0),cr=db.receipts.filter(x=>x.party===p).reduce((a,x)=>a+n(x.amount),0)+db.purchases.filter(x=>x.party===p).reduce((a,x)=>a+n(x.total),0);return[p,money(dr),money(cr),money(dr-cr)]});show('Party Ledger',tbl(['Ledger','Debit','Credit','Balance'],r)+(r.length?'':'<div class="empty">ZERO LEDGER DATA</div>'))}
+function outstandingView(){var r=db.invoices.reduce((a,x)=>a+n(x.total),0)-db.receipts.reduce((a,x)=>a+n(x.amount),0),p=db.purchases.reduce((a,x)=>a+n(x.total),0)-db.payments.reduce((a,x)=>a+n(x.amount),0);show('Outstanding','<div class="summaryCards"><div><small>Receivable</small><b>'+money(r)+'</b></div><div><small>Payable</small><b>'+money(p)+'</b></div></div>')}
+function cashView(){var i=db.receipts.reduce((a,x)=>a+n(x.amount),0),o=db.payments.reduce((a,x)=>a+n(x.amount),0)+db.expenses.reduce((a,x)=>a+n(x.amount),0);show('Cash / Bank','<div class="summaryCards"><div><small>Money In</small><b>'+money(i)+'</b></div><div><small>Money Out</small><b>'+money(o)+'</b></div><div><small>Net</small><b>'+money(i-o)+'</b></div></div>')}
+function profitView(){var s=db.invoices.reduce((a,x)=>a+n(x.taxable),0),p=db.purchases.reduce((a,x)=>a+n(x.taxable),0),e=db.expenses.reduce((a,x)=>a+n(x.amount),0);show('Profit Report','<div class="summaryCards"><div><small>Sales</small><b>'+money(s)+'</b></div><div><small>Purchase</small><b>'+money(p)+'</b></div><div><small>Expense</small><b>'+money(e)+'</b></div><div><small>Profit View</small><b>'+money(s-p-e)+'</b></div></div>')}
+function voucherView(){show('Voucher Register',tbl(['Type','No.','Date','Party','Debit','Credit'],db.vouchers.map(x=>[x.type,x.no,x.date||'',x.party||'',money(x.debit),money(x.credit)]))+(db.vouchers.length?'':'<div class="empty">ZERO VOUCHERS</div>'))}
+function gstView(){var out=db.invoices.reduce((a,x)=>a+n(x.gst),0),inp=db.purchases.reduce((a,x)=>a+n(x.gst),0);show('GST Summary','<div class="summaryCards"><div><small>Output GST</small><b>'+money(out)+'</b></div><div><small>Input GST</small><b>'+money(inp)+'</b></div><div><small>Net GST</small><b>'+money(out-inp)+'</b></div></div>')}
+save();render();
