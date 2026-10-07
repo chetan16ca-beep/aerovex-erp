@@ -113,3 +113,30 @@ function profitView(){var s=db.invoices.reduce((a,x)=>a+n(x.taxable),0),p=db.pur
 function voucherView(){show('Voucher Register',tbl(['Type','No.','Date','Party','Debit','Credit'],db.vouchers.map(x=>[x.type,x.no,x.date||'',x.party||'',money(x.debit),money(x.credit)]))+(db.vouchers.length?'':'<div class="empty">ZERO VOUCHERS</div>'))}
 function gstView(){var out=db.invoices.reduce((a,x)=>a+n(x.gst),0),inp=db.purchases.reduce((a,x)=>a+n(x.gst),0);show('GST Summary','<div class="summaryCards"><div><small>Output GST</small><b>'+money(out)+'</b></div><div><small>Input GST</small><b>'+money(inp)+'</b></div><div><small>Net GST</small><b>'+money(out-inp)+'</b></div></div>')}
 save();render();
+
+
+/* A4 TALLY STYLE TAX INVOICE PRINT */
+function amountWords(n){n=Math.round(n);if(!n)return'Zero Rupees Only';var a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'],b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];function w(x){if(x<20)return a[x];if(x<100)return b[Math.floor(x/10)]+(x%10?' '+a[x%10]:'');if(x<1000)return a[Math.floor(x/100)]+' Hundred'+(x%100?' '+w(x%100):'');if(x<100000)return w(Math.floor(x/1000))+' Thousand'+(x%1000?' '+w(x%1000):'');if(x<10000000)return w(Math.floor(x/100000))+' Lakh'+(x%100000?' '+w(x%100000):'');return w(Math.floor(x/10000000))+' Crore'+(x%10000000?' '+w(x%10000000):'')}return'Rupees '+w(n)+' Only'}
+function invoiceList(){
+ var rows=db.invoices.map(function(x,i){return'<tr><td>'+(i+1)+'</td><td>'+esc(x.invoiceNo)+'</td><td>'+esc(x.date)+'</td><td>'+esc(x.party)+'</td><td>'+money(x.total)+'</td><td><button class="mini" onclick="printInvoice('+i+')">View / Print</button></td></tr>'}).join('');
+ show('Sales Invoices','<button class="primary" onclick="invoiceForm()">＋ New Sales Invoice</button><br><br>'+tbl(['#','Invoice No.','Date','Party','Total','Action'],db.invoices.map(function(x,i){return[i+1,esc(x.invoiceNo),esc(x.date),esc(x.party),money(x.total),'<button class="mini" onclick="printInvoice('+i+')">View / Print</button>']}))+(rows?'':'<div class="empty">ZERO SALES INVOICES</div>'))
+}
+function esc(v){return String(v||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function printInvoice(i){
+ var x=db.invoices[i];if(!x)return;
+ var gstp=n(x.gstPercent),cg=x.taxType==='IGST'?0:n(x.gst)/2,sg=cg,ig=x.taxType==='IGST'?n(x.gst):0;
+ var html='<div class="taxInvoice">'+
+ '<div class="invHead"><div class="invLogo"><img src="assets/aerovex-logo.png" onerror="this.style.display=\\'none\\';this.nextElementSibling.style.display=\\'block\\'"><div style="display:none"><strong>AEROVEX</strong><small>FILTRATION<br>Smart Filtration Solutions</small></div></div><div class="company"><h2>AEROVEX FILTRATION</h2><p>GIDC, Ankleshwar, Bharuch - 393002, Gujarat, India<br>Ph: 7405915266 &nbsp; Email: aerovexfiltration@gmail.com<br><b>GSTIN: 24BPCPB7271L1ZW</b></p></div></div>'+
+ '<div class="invTitle"><b>TAX INVOICE</b><span>Original for Recipient</span></div>'+
+ '<div class="invMeta"><div><small>Bill To</small><h3>'+esc(x.party)+'</h3><p>GSTIN: '+esc(x.gstin||'—')+'<br>State: '+esc(x.place||'Gujarat')+'</p></div><div class="metaGrid"><p>Invoice No.<b>'+esc(x.invoiceNo)+'</b></p><p>Invoice Date<b>'+esc(x.date)+'</b></p><p>Reference No.<b>'+esc(x.ref||'—')+'</b></p><p>PO No.<b>'+esc(x.ref||'—')+'</b></p><p>Dispatch To<b>Same as Billing Address</b></p><p>Tax Type<b>'+esc(x.taxType||'CGST + SGST')+'</b></p></div></div>'+
+ '<table class="items"><thead><tr><th>Sr.</th><th>Description of Goods</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Rate (₹)</th><th>Amount (₹)</th></tr></thead><tbody><tr><td>1</td><td><b>'+esc(x.description)+'</b></td><td>'+esc(x.hsn)+'</td><td>'+x.qty+'</td><td>Nos</td><td>'+n(x.rate).toLocaleString('en-IN',{minimumFractionDigits:2})+'</td><td>'+n(x.taxable).toLocaleString('en-IN',{minimumFractionDigits:2})+'</td></tr></tbody></table>'+
+ '<div class="totals"><p><span>Total Amount</span><b>'+money(x.taxable)+'</b></p>'+(cg?'<p><span>CGST @ '+gstp/2+'%</span><b>'+money(cg)+'</b></p><p><span>SGST @ '+gstp/2+'%</span><b>'+money(sg)+'</b></p>':'')+(ig?'<p><span>IGST @ '+gstp+'%</span><b>'+money(ig)+'</b></p>':'')+'<p class="grand"><span>Grand Total</span><b>'+money(x.total)+'</b></p></div>'+
+ '<div class="words"><b>Amount in Words:</b><br>'+amountWords(x.total)+'</div>'+
+ '<div class="invBottom"><div><h3>Bank Details</h3><p>Bank Name: ____________________<br>A/c Name: Aerovex Filtration<br>A/c No.: ____________________<br>IFSC: ____________________<br>Branch: Ankleshwar, Gujarat</p></div><div><h3>Terms & Conditions</h3><ol><li>Goods once sold will not be taken back or exchanged.</li><li>Payment as per agreed credit terms.</li><li>Subject to Ankleshwar, Gujarat jurisdiction.</li><li>Goods supplied as per approved specification.</li></ol></div></div>'+
+ '<div class="sign"><span>Thank you for your business!</span><div>For <b>AEROVEX FILTRATION</b><br><br><br>Authorised Signatory</div></div>'+
+ '<div class="noPrint printBar"><button class="primary" onclick="window.print()">Print / Save PDF</button></div></div>';
+ show('Tax Invoice',html)
+}
+var _openModuleTally=openModule;
+openModule=function(name){if(name==='Sales Invoice')return invoiceList();return _openModuleTally(name)}
+render();
