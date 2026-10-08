@@ -11,7 +11,7 @@
 
 /* Original logo watermark: ERP background and invoice paper */
 body.axHasWatermark::before{content:"";position:fixed;inset:12% 3%;background-image:var(--ax-watermark-url);background-repeat:no-repeat;background-position:center;background-size:min(78vw,700px) auto;opacity:.045;pointer-events:none;z-index:0}
-body.axHasWatermark>header,body.axHasWatermark>main,body.axHasWatermark>.modal{position:relative;z-index:1}
+body.axHasWatermark>header,body.axHasWatermark>main{position:relative;z-index:1}body.axHasWatermark>.modal{position:fixed;inset:0;z-index:50}
 .axPrintPaper{position:relative;isolation:isolate}
 .axInvoiceWatermark{position:absolute;z-index:0;top:36%;left:50%;transform:translate(-50%,-50%);width:75%;max-height:430px;object-fit:contain;opacity:.075;pointer-events:none}
 .axPrintPaper>*:not(.axInvoiceWatermark){position:relative;z-index:1}
@@ -20,3 +20,7 @@ body.axHasWatermark>header,body.axHasWatermark>main,body.axHasWatermark>.modal{p
 .axPrintWordmark span{font-size:clamp(13px,2vw,21px);letter-spacing:3px}
 .axPrintWordmark small{font-size:11px;letter-spacing:1px;color:#49657a;margin-top:5px}
 @media print{body.axHasWatermark::before{display:none!important}.axInvoiceWatermark{opacity:.075!important;visibility:visible!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.axPrintPaper{isolation:isolate}}
+
+/* Ensure splash never blocks touch after startup */
+.axSplash{pointer-events:none!important}
+body.axHasWatermark .modal:not(.hidden){display:grid;position:fixed;inset:0;z-index:50}
