@@ -154,3 +154,12 @@ function axPrintInvoice(i){
  const html='<div class="axPrintPaper">'+(logo?'<img class="axInvoiceWatermark" alt="" aria-hidden="true" src="'+logo+'">':'')+'<div class="axPrintHeader"><div class="axPrintLogoWrap">'+logomark+'</div><div class="axPrintCompany"><h2>AEROVEX FILTRATION</h2><p>GIDC, Ankleshwar, Bharuch - 393002, Gujarat, India<br>Phone: 7405915266<br>Email: aerovexfiltration@gmail.com<br><strong>GSTIN: 24BPCPB7271L1ZW</strong></p></div></div><div class="axPrintTitle">TAX INVOICE <small>Original for Recipient</small></div><div class="axPrintMeta"><div><b>Bill To</b><h3>'+e(x.party)+'</h3><p>GSTIN: '+e(x.gstin||'Not recorded')+'<br>Place of Supply: '+e(x.place||'Not recorded')+'</p></div><div><p><b>Invoice No:</b> '+e(x.invoiceNo||'Not recorded')+'</p><p><b>Invoice Date:</b> '+e(x.date||'Not recorded')+'</p><p><b>PO / Reference:</b> '+e(x.ref||'Not recorded')+'</p><p><b>Tax Type:</b> '+e(taxType||'Not recorded')+'</p></div></div><table class="axPrintItems"><thead><tr><th>Sr.</th><th>Description of Goods</th><th>HSN/SAC</th><th>Qty</th><th>Unit</th><th>Rate (₹)</th><th>Amount (₹)</th></tr></thead><tbody>'+itemRows+'</tbody></table><div class="axPrintTotals">'+line('Taxable Value',taxable)+(taxType==='IGST'?line('IGST',ig):line('CGST',cg)+line('SGST',sg))+line('Freight / Other',other)+line('Round Off',round)+'<div class="axPrintGrand"><span>Grand Total</span><b>₹ '+fmt(total)+'</b></div></div><div class="axPrintWords"><b>Amount in Words:</b><br>'+axAmountWords(total)+'</div>'+warning+'<div class="axPrintBottom"><div><h3>Bank Details</h3><p>Bank: Not configured<br>Account: Not configured<br>IFSC: Not configured</p></div><div><h3>Terms & Conditions</h3><p>As mutually agreed with the customer.<br>Subject to Ankleshwar jurisdiction.</p></div></div><div class="axPrintSign"><span>Thank you for your business!</span><span>For <b>AEROVEX FILTRATION</b><br><br><br>Authorized Signatory</span></div></div><div class="axPrintActions"><button class="primary" onclick="window.print()">🖨 Print / Save PDF</button><button onclick="axInvoices()">Back</button></div>';
  show('Invoice Preview',html);
 }
+
+setTimeout(function(){var splash=document.getElementById('axSplash');if(splash)splash.remove()},3200);
+document.addEventListener('click',function(event){
+ var tile=event.target.closest('.tile');
+ if(!tile||!tile.closest('#production,#accounts,#masters'))return;
+ event.stopPropagation();
+ var name=tile.querySelector('b');
+ if(name)openModule(name.textContent.trim());
+},true);
