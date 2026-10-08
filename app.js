@@ -188,6 +188,31 @@ function axDownloadBackup(){
   btn.addEventListener('click',axDownloadBackup);
   const menu=document.getElementById('menu');
   header.insertBefore(btn,menu||null);
+  const importBtn=document.createElement('button');
+  importBtn.id='axImportBtn';importBtn.type='button';importBtn.textContent='⬆ Restore';
+  importBtn.title='Restore a previously downloaded Aerovex ERP backup';
+  importBtn.style.cssText='padding:9px;border:1px solid #b8d1d9;border-radius:9px;background:#fff;color:#084d60;font-weight:700;cursor:pointer;margin-right:8px';
+  const picker=document.createElement('input');
+  picker.type='file';picker.accept='.json,application/json';picker.hidden=true;
+  importBtn.addEventListener('click',()=>picker.click());
+  picker.addEventListener('change',async function(){
+    const file=picker.files&&picker.files[0];if(!file)return;
+    try{
+      const payload=JSON.parse(await file.text());
+      if(payload.application!=='Aerovex ERP'||payload.storageKey!==KEY||!payload.data||typeof payload.data!=='object'||Array.isArray(payload.data))throw Error('This is not a valid Aerovex ERP backup');
+      const keys=Object.keys(blank());
+      if(!keys.every(k=>Array.isArray(payload.data[k])))throw Error('Backup is missing ERP modules');
+      const current=localStorage.getItem(KEY);
+      if(!confirm('RESTORE BACKUP? This replaces all ERP records on THIS device with the selected backup. Continue?'))return;
+      if(current){const safety=JSON.stringify({application:'Aerovex ERP',formatVersion:1,createdAt:new Date().toISOString(),storageKey:KEY,data:JSON.parse(current)});const blob=new Blob([safety],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Aerovex-Before-Restore-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+      localStorage.setItem(KEY,JSON.stringify(payload.data));
+      alert('Backup restored. ERP will reload now.');
+      location.reload();
+    }catch(e){alert('Restore failed: '+e.message)}
+    finally{picker.value=''}
+  });
+  header.insertBefore(importBtn,menu||null);
+  header.appendChild(picker);
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addBackupButton);
  else addBackupButton();
