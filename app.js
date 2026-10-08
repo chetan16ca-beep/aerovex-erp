@@ -271,3 +271,25 @@ vno=function(prefix,rows){let max=0;for(const o of rows){for(const v of [o.invoi
  if(!modules.accounts.some(x=>x[0]==='Print / PDF Center'))modules.accounts.push(['Print / PDF Center','Quotation • Challan • Orders • Vouchers • Registers']);
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render);else render();
 })();
+
+/* Print-ready ledger and document registers; never changes ERP records. */
+(function(){
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[c]));
+const configs={
+'Quotation':['quotations','Quotation','quotationNo'],
+'Sales Order / PO':['salesOrders','Sales Order','orderNo'],
+'Delivery Challan':['challans','Delivery Challan','challanNo'],
+'Purchase Order':['purchaseOrders','Purchase Order','poNo'],
+'Purchase':['purchases','Purchase Invoice','invoiceNo'],
+'Receipt':['receipts','Receipt Voucher','no'],
+'Payment':['payments','Payment Voucher','no'],
+'Expenses':['expenses','Expense Voucher','no'],
+'Work Orders':['workOrders','Work Order','workNo']
+};
+function openPrint(title,columns,rows){const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print / save PDF');return}w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{size:A4;margin:14mm}body{font:12px Arial;color:#182d3c}h1{font-size:20px;margin-bottom:4px}h2{font-size:15px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #8fa5b1;padding:7px;text-align:left;overflow-wrap:anywhere}th{background:#eaf3f8}footer{margin-top:35px;display:flex;justify-content:space-between}small{color:#555}</style></head><body><h1>AEROVEX FILTRATION</h1><h2>'+esc(title)+'</h2><small>Printed: '+esc(new Date().toLocaleString('en-IN'))+'</small><table><thead><tr>'+columns.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table><footer><span>Prepared By: __________________</span><span>Authorized Signatory: __________________</span></footer></body></html>');w.document.close();w.focus();setTimeout(()=>w.print(),350)}
+window.axPrintRegister=function(key){const config=Object.values(configs).find(x=>x[0]===key);if(!config)return;const [k,title,id]=config,rows=(db[k]||[]).map(x=>[x[id]||x.no||'',x.date||'',x.party||'',x.description||x.remark||'',x.total||x.amount||x.qty||'']);openPrint(title+' Register',['Document No','Date','Party','Details','Amount / Qty'],rows)};
+window.axPrintLedger=function(){const parties=[...new Set([...db.invoices,...db.receipts,...db.purchases,...db.payments].map(x=>x.party).filter(Boolean))].sort();const rows=parties.map(p=>{const sales=db.invoices.filter(x=>x.party===p).reduce((a,x)=>a+Number(x.total||0),0),rec=db.receipts.filter(x=>x.party===p).reduce((a,x)=>a+Number(x.amount||0),0),purchase=db.purchases.filter(x=>x.party===p).reduce((a,x)=>a+Number(x.total||0),0),paid=db.payments.filter(x=>x.party===p).reduce((a,x)=>a+Number(x.amount||0),0);return [p,(sales+paid).toFixed(2),(rec+purchase).toFixed(2),(sales+paid-rec-purchase).toFixed(2)]});openPrint('Party Ledger',['Party','Debit (₹)','Credit (₹)','Balance (₹)'],rows)};
+window.axPrintOutstanding=function(){const parties=[...new Set([...db.invoices,...db.receipts,...db.purchases,...db.payments].map(x=>x.party).filter(Boolean))].sort();const rows=parties.map(p=>{const total=(arr,field)=>arr.filter(x=>x.party===p).reduce((a,x)=>a+Number(x[field]||0),0);return [p,(total(db.invoices,'total')-total(db.receipts,'amount')).toFixed(2),(total(db.purchases,'total')-total(db.payments,'amount')).toFixed(2)]});openPrint('Outstanding Report',['Party','Receivable (₹)','Payable (₹)'],rows)};
+const oldOpen=openModule;
+openModule=function(name){if(name==='Party Ledger'){ledgerView();document.querySelector('#modalBody').insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintLedger()">🖨 Print Ledger / PDF</button></p>');return}if(name==='Outstanding'){outstandingView();document.querySelector('#modalBody').insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintOutstanding()">🖨 Print Outstanding / PDF</button></p>');return}if(configs[name]){const result=oldOpen(name);const config=configs[name];const modal=document.querySelector('#modalBody');if(modal)modal.insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintRegister(\''+config[0]+'\')">🖨 Print '+config[1]+' Register / PDF</button></p>');return result}return oldOpen(name)};
+})();
