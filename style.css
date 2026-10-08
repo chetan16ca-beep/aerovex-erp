@@ -11,7 +11,7 @@
 
 /* Original logo watermark: ERP background and invoice paper */
 body.axHasWatermark::before{content:"";position:fixed;inset:12% 3%;background-image:var(--ax-watermark-url);background-repeat:no-repeat;background-position:center;background-size:min(78vw,700px) auto;opacity:.045;pointer-events:none;z-index:0}
-body.axHasWatermark>header,body.axHasWatermark>main{position:relative;z-index:1}body.axHasWatermark>.modal{position:fixed;inset:0;z-index:50}
+body.axHasWatermark>.modal{position:fixed;inset:0;z-index:1000}
 .axPrintPaper{position:relative;isolation:isolate}
 .axInvoiceWatermark{position:absolute;z-index:0;top:36%;left:50%;transform:translate(-50%,-50%);width:75%;max-height:430px;object-fit:contain;opacity:.075;pointer-events:none}
 .axPrintPaper>*:not(.axInvoiceWatermark){position:relative;z-index:1}
@@ -24,3 +24,9 @@ body.axHasWatermark>header,body.axHasWatermark>main{position:relative;z-index:1}
 /* Ensure splash never blocks touch after startup */
 .axSplash{pointer-events:none!important}
 body.axHasWatermark .modal:not(.hidden){display:grid;position:fixed;inset:0;z-index:50}
+
+/* App interaction recovery */
+#modal:not(.hidden){position:fixed!important;inset:0!important;display:grid!important;z-index:10000!important;pointer-events:auto!important}
+#modal.hidden{display:none!important}
+#modal .sheet{pointer-events:auto!important;position:relative!important}
+.axSplash{pointer-events:none!important}
