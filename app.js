@@ -239,3 +239,16 @@ function axDownloadBackup(){
  const account=modules.accounts;if(!account.some(x=>x[0]==='GST Reports / CA Export'))account.push(['GST Reports / CA Export','Monthly sales, purchase & CA exports']);
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render);else render();
 })();
+
+/* Automatic document numbering, independent series; existing records untouched. */
+(function(){
+const prefixes={quotations:'AFX/QTN',salesOrders:'AFX/SO',challans:'AFX/DC',purchaseOrders:'AFX/PO'};
+const field={quotations:'quotationNo',salesOrders:'orderNo',challans:'challanNo',purchaseOrders:'poNo'};
+function next(key){const prefix=prefixes[key],list=db[key]||[];let max=0;for(const o of list){for(const v of [o[field[key]],o.no,o.ref]){const m=String(v||'').match(new RegExp('^'+prefix.replace('/','\\/')+'/(\\d+)$','i'));if(m)max=Math.max(max,Number(m[1]))}}return prefix+'/'+String(Math.max(max,list.length)+1).padStart(4,'0')}
+function create(title,key){const no=next(key),fn=field[key];show(title,'<form class="form" data-key="'+key+'" onsubmit="event.preventDefault();axSaveNumberedDoc(this)"><label>Document No.<input name="'+fn+'" value="'+no+'" readonly></label><label>Party<input name="party" required></label><label>Date<input name="date" type="date" value="'+tday()+'" required></label><label>Customer / Supplier Reference<input name="ref"></label><label>Amount<input name="amount" type="number" min="0" step=".01"></label><label class="full">Description<textarea name="description"></textarea></label><div class="full"><button class="primary">Save '+title+'</button></div></form>')}
+window.axSaveNumberedDoc=function(form){const key=form.dataset.key;if(!prefixes[key])return;const o=Object.fromEntries(new FormData(form)),fn=field[key];o[fn]=next(key);if((db[key]||[]).some(x=>x[fn]===o[fn])){alert('Document number already exists. Reopen and try again.');return}db[key].push(o);save();closeModal();render()};
+const previous=openModule;
+openModule=function(name){const mapping={'Quotation':['Quotation','quotations'],'New Quotation':['Quotation','quotations'],'Sales Order / PO':['Sales Order / PO','salesOrders'],'Delivery Challan':['Delivery Challan','challans'],'Purchase Order':['Purchase Order','purchaseOrders']};if(mapping[name])return create(...mapping[name]);return previous(name)};
+const oldVno=vno;
+vno=function(prefix,rows){let max=0;for(const o of rows){for(const v of [o.invoiceNo,o.no,o.workNo,o.ref]){const m=String(v||'').match(new RegExp('^'+prefix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/(\\d+)$','i'));if(m)max=Math.max(max,Number(m[1]))}}return prefix+'/'+String(Math.max(max,rows.length)+1).padStart(4,'0')};
+})();
