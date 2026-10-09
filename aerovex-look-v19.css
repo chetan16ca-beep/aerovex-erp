@@ -1,0 +1,39 @@
+/* Aerovex ERP V19 — polished professional interface, responsive */
+:root{--ax-radius:14px;--ax-ink:#183247;--ax-muted:#6c7f8f}
+body{background:linear-gradient(180deg,#eef4f8 0,#f7f9fb 320px)!important;font-family:Inter,"Segoe UI",system-ui,Arial,sans-serif!important}
+body>header{backdrop-filter:blur(14px);padding-inline:clamp(12px,3vw,42px)!important}
+body>header .brand{gap:13px}
+body>header .brand .mark{width:49px!important;height:49px!important;border-radius:14px!important;box-shadow:0 3px 12px #092f4d19}
+body>header .brand b{letter-spacing:.045em;font-weight:850!important}
+main{max-width:1460px!important}
+.hero{min-height:185px;gap:20px;align-items:center!important;background:linear-gradient(120deg,var(--ax-brand-dark),var(--ax-brand))!important}
+.hero h1{font-size:clamp(25px,3.4vw,40px)!important;font-weight:850!important}
+.hero>div:first-child{position:relative;z-index:1}
+.hero button{cursor:pointer;border-radius:10px!important;transition:filter .2s}
+.hero button:hover{filter:brightness(1.12)}
+.kpis{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.kpi{background:linear-gradient(160deg,#fff,#fafdff)!important;min-height:112px;transition:transform .2s,box-shadow .2s}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 10px 26px #173c5616!important}
+.kpi strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.panel{background:#fff!important}
+.panelHead{gap:12px;flex-wrap:wrap}
+.panelHead h2{letter-spacing:-.025em;font-weight:800!important}
+#axCFMProduction{background:linear-gradient(145deg,#fff,#f8fcff)!important}
+.axCFMNav{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))!important;gap:12px!important}
+.axCFMNav button{min-height:64px!important;background:#fff!important;border:1px solid #dae7ed!important;color:var(--ax-brand-dark)!important;box-shadow:0 3px 12px #0e38520a!important;text-align:left;transition:all .2s}
+.axCFMNav button:hover{background:var(--ax-brand-light)!important;transform:translateY(-2px)}
+.quick,.tiles{grid-template-columns:repeat(auto-fit,minmax(195px,1fr))!important;gap:12px!important}
+.tile,.quick button{background:linear-gradient(165deg,#fff,#fbfdff)!important;min-height:76px;box-shadow:0 3px 10px #13334b09!important}
+.tile{border-left:3px solid var(--ax-brand)!important}
+.tile small{line-height:1.5!important}
+button,.tile{touch-action:manipulation}
+button:focus-visible,.tile:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--ax-brand)!important;outline-offset:2px}
+.sheet{width:min(1020px,100%)!important;max-height:94vh!important;border-radius:18px!important;box-shadow:0 28px 90px #0b243655!important}
+.sheet h2{color:var(--ax-brand-dark)}
+.form input,.form select,.form textarea,.axWOGrid input,.axWOGrid select{border:1px solid #ccdce6!important;background:#fff!important;border-radius:10px!important;min-height:40px}
+.primary{background:var(--ax-brand)!important;box-shadow:0 3px 9px rgba(var(--ax-brand-rgb),.2)}
+.axWOCard,.axWOLine{box-shadow:0 3px 12px #16394d0b}
+.axReportOptions button:hover{border-color:var(--ax-brand)!important;background:var(--ax-brand-light)!important}
+@media(max-width:850px){main{padding:12px!important}.hero{padding:22px!important;min-height:0;flex-wrap:wrap}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.kpi{min-height:95px;padding:15px!important}.kpi strong{font-size:24px!important}.panel{padding:15px!important;margin:12px 0!important}.axCFMNav{grid-template-columns:repeat(2,minmax(0,1fr))!important}.quick,.tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:480px){body>header{height:65px!important}.brand b{font-size:12px!important}.brand small{font-size:9px!important}.hero h1{font-size:26px!important}.hero .status{font-size:10px!important}.kpi strong{font-size:22px!important}.quick,.tiles{grid-template-columns:1fr 1fr!important}.tile,.quick button{padding:12px!important;font-size:12px}.axCFMNav button{font-size:12px!important;padding:12px 9px!important}.sheet{padding:14px!important}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
