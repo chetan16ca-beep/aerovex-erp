@@ -55,4 +55,5 @@ if(stored){
  const root=document.documentElement;root.style.setProperty('--ax-brand','rgb('+r+','+g+','+b+')');root.style.setProperty('--ax-brand-dark','rgb('+dark.join(',')+')');root.style.setProperty('--ax-brand-rgb',[r,g,b].join(','));root.style.setProperty('--ax-brand-light','rgba('+[r,g,b].join(',')+',.09)');
  }catch(e){} };im.src=stored;
 }
+window.addEventListener('aerovex-logo-updated',()=>location.reload());
 })();
