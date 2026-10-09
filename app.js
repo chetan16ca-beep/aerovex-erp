@@ -293,3 +293,37 @@ window.axPrintOutstanding=function(){const parties=[...new Set([...db.invoices,.
 const oldOpen=openModule;
 openModule=function(name){if(name==='Party Ledger'){ledgerView();document.querySelector('#modalBody').insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintLedger()">🖨 Print Ledger / PDF</button></p>');return}if(name==='Outstanding'){outstandingView();document.querySelector('#modalBody').insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintOutstanding()">🖨 Print Outstanding / PDF</button></p>');return}if(configs[name]){const result=oldOpen(name);const config=configs[name];const modal=document.querySelector('#modalBody');if(modal)modal.insertAdjacentHTML('beforeend','<p><button type="button" onclick="axPrintRegister(\''+config[0]+'\')">🖨 Print '+config[1]+' Register / PDF</button></p>');return result}return oldOpen(name)};
 })();
+
+/* Printable ledger and other financial registers; read-only previews. */
+(function(){
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[c]));
+const amt=v=>Number(v||0);
+function printDoc(title,heads,rows){
+ const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print');return}
+ const table='<table><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+ w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{size:A4;margin:14mm}body{font:12px Arial;color:#1b2734}h1{font-size:19px;margin-bottom:3px}small{color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #9aa8b2;padding:7px;text-align:left}th{background:#eef3f6}tr{break-inside:avoid}.foot{margin-top:40px;text-align:right}</style></head><body><h1>AEROVEX FILTRATION</h1><small>Smart Filtration Solutions</small><h2>'+esc(title)+'</h2>'+table+'<p class="foot">For AEROVEX FILTRATION<br><br>Authorized Signatory</p></body></html>');
+ w.document.close();w.focus();setTimeout(()=>w.print(),400);
+}
+window.axLedgerPrint=function(){
+ const parties=[...new Set([...db.invoices,...db.receipts,...db.purchases,...db.payments].map(x=>x.party).filter(Boolean))].sort();
+ const rows=parties.map(p=>{const debit=db.invoices.filter(x=>x.party===p).reduce((a,x)=>a+amt(x.total),0)+db.payments.filter(x=>x.party===p).reduce((a,x)=>a+amt(x.amount),0);const credit=db.receipts.filter(x=>x.party===p).reduce((a,x)=>a+amt(x.amount),0)+db.purchases.filter(x=>x.party===p).reduce((a,x)=>a+amt(x.total),0);return [p,debit.toFixed(2),credit.toFixed(2),(debit-credit).toFixed(2)]});
+ printDoc('Party Ledger Summary',['Party / Ledger','Debit (INR)','Credit (INR)','Balance (INR)'],rows);
+};
+window.axPrintRegister=function(key,title){
+ const list=Array.isArray(db[key])?db[key]:[];
+ const heads=['Document No','Date','Party','Amount (INR)','Description / Reference'];
+ const rows=list.map(x=>[x.invoiceNo||x.quotationNo||x.challanNo||x.orderNo||x.poNo||x.no||x.workNo||'',x.date||'',x.party||'',x.total??x.amount??'',x.description||x.remark||x.ref||'']);
+ printDoc(title,heads,rows);
+};
+const original=openModule;
+openModule=function(name){
+ if(name==='Party Ledger'){ledgerView();const root=document.getElementById('modalBody');if(root){const b=document.createElement('button');b.type='button';b.className='primary';b.textContent='🖨 Print Ledger / Save PDF';b.addEventListener('click',axLedgerPrint);root.insertBefore(b,root.children[1]||null)}return}
+ const docs={'Quotation':'quotations','Delivery Challan':'challans','Sales Order / PO':'salesOrders','Purchase Order':'purchaseOrders','Purchase':'purchases','Receipt':'receipts','Payment':'payments','Expenses':'expenses','Work Orders':'workOrders'};
+ const result=original(name);
+ if(docs[name]){
+   const root=document.getElementById('modalBody');
+   if(root){const b=document.createElement('button');b.type='button';b.textContent='🖨 Print Register / Save PDF';b.addEventListener('click',()=>axPrintRegister(docs[name],name));root.appendChild(b)}
+ }
+ return result;
+};
+})();
