@@ -40,8 +40,9 @@ window.axPrintQuotation=function(){
  if(!w){alert('Please allow pop-ups for quotation printing');return}
  const styles='@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#172b3a;font:12px Arial,sans-serif}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0b4961;padding-bottom:12px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #9aa;padding:6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}h1{font-size:20px}h2{font-size:16px}p{line-height:1.55}.axQuotePrint{padding:0!important;width:100%;max-width:100%}';
  w.document.open();
- w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Quotation - Aerovex Filtration</title><style>'+styles+'</style></head><body>'+paper.outerHTML+'<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print()},250)})<\\/script></body></html>');
+ w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Quotation - Aerovex Filtration</title><style>'+styles+'</style></head><body>'+paper.outerHTML+'</body></html>');
  w.document.close();
+ setTimeout(function(){w.focus();w.print()},400);
 };
 
 })();
