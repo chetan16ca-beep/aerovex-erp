@@ -12,7 +12,7 @@ function wrapPreview(name,key,type){const fn=window[name];if(typeof fn!=='functi
 wrapPreview('axQuotationPreview','quotations','Quotation');
 wrapPreview('axPrintInvoice','invoices','Invoice');
 const doc=window.axDocPreview;
-if(typeof doc==='function')window.axDocPreview=function(type,i){const result=doc.apply(this,arguments);const key=type==='Delivery Challan'?'challans':type==='Tax Invoice'?'invoices':type==='Sales Order / PO'?'salesOrders':null;const x=key&&record(key,i);if(x)select(x,type);return result};
+if(typeof doc==='function')window.axDocPreview=function(type,i){const result=doc.apply(this,arguments);const key=type==='Delivery Challan'?'challans':type==='Sales Invoice'?'invoices':type==='Sales Order / PO'?'salesOrders':type==='Purchase Order'?'purchaseOrders':type==='Purchase'?'purchases':null;const x=key&&record(key,i);if(x)select(x,type);return result};
 function wrapPopup(name){const original=window[name];if(typeof original!=='function')return;window[name]=function(){const oldOpen=window.open;window.open=function(){const w=oldOpen.apply(window,arguments);if(!w||!active)return w;const originalWrite=w.document.write.bind(w.document);w.document.write=function(html){return originalWrite(String(html).replace(/<title>[^<]*<\/title>/i,'<title>'+active+'</title>'))};return w};try{return original.apply(this,arguments)}finally{window.open=oldOpen}}}
 wrapPopup('axPrintQuotation');wrapPopup('axPrintDoc');
 })();
