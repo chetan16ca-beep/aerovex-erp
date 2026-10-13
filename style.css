@@ -30,3 +30,7 @@ body.axHasWatermark .modal:not(.hidden){display:grid;position:fixed;inset:0;z-in
 #modal.hidden{display:none!important}
 #modal .sheet{pointer-events:auto!important;position:relative!important}
 .axSplash{pointer-events:none!important}
+
+/* Spacious technical specification fields in quotations, invoices and challans */
+.axMncLine label:has([data-field="description"]),.axDocLine label:has([data-field="description"]){grid-column:1/-1!important}
+.axMncLine [data-field="description"],.axDocLine [data-field="description"],#axQuoteForm textarea[name="description"],.form textarea[name="description"]{display:block;width:100%!important;min-height:130px!important;padding:12px!important;font-size:15px!important;line-height:1.5!important;box-sizing:border-box!important}
