@@ -1,10 +1,19 @@
 {
   "name": "Aerovex Filtration ERP",
   "short_name": "Aerovex ERP",
-  "id": "./",
-  "start_url": "./?pwa=27",
+  "id": "./aerovex-filtration-erp",
+  "start_url": "./?pwa=29",
   "display": "standalone",
   "background_color": "#f3f6f8",
   "theme_color": "#0b4961",
-  "description": "Aerovex Filtration Business and Production ERP"
+  "description": "Aerovex Filtration Business and Production ERP",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "./aerovex-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
