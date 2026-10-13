@@ -52,3 +52,20 @@ body.axHasWatermark .modal:not(.hidden){display:grid;position:fixed;inset:0;z-in
 .axQuotePrint th:nth-child(7),.axQuotePrint td:nth-child(7){width:12%!important}
 @media(max-width:600px){.axQuotePrint{padding:8px!important;font-size:10px!important}.axQuotePrint header{gap:10px!important}.axQuotePrint header h1{font-size:15px!important}.axQuotePrint header h2{font-size:12px!important}.axQuotePrint table{font-size:9px!important}.axQuotePrint th,.axQuotePrint td{padding:4px 2px!important}}
 @media print{.axQuotePrint{padding:0!important}.axQuotePrint header{grid-template-columns:55% 45%!important}.axQuotePrint table{font-size:10px!important}}
+
+/* V35: consistent readable document previews across all ERP document types */
+.axDocPaper,.axPrintPaper{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;overflow-wrap:anywhere!important}
+.axDocPaper header,.axPrintPaper .axPrintHeader{display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr)!important;gap:16px!important;align-items:start!important;min-width:0!important}
+.axDocPaper header>div,.axPrintPaper .axPrintHeader>div{min-width:0!important;overflow-wrap:anywhere!important;line-height:1.5!important}
+.axDocPaper header h1,.axPrintPaper .axPrintHeader h2{font-size:18px!important;line-height:1.25!important;margin:0 0 8px!important}
+.axDocPaper table,.axPrintPaper table{width:100%!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:10px!important}
+.axDocPaper th,.axDocPaper td,.axPrintPaper th,.axPrintPaper td{overflow-wrap:anywhere!important;word-break:normal!important;white-space:normal!important;vertical-align:top!important;padding:6px 4px!important}
+.axDocPaper th:nth-child(1),.axDocPaper td:nth-child(1){width:5%!important}
+.axDocPaper th:nth-child(2),.axDocPaper td:nth-child(2){width:45%!important}
+.axDocPaper th:nth-child(3),.axDocPaper td:nth-child(3){width:12%!important}
+.axDocPaper th:nth-child(4),.axDocPaper td:nth-child(4){width:12%!important}
+.axDocPaper th:nth-child(5),.axDocPaper td:nth-child(5){width:12%!important}
+.axDocPaper th:nth-child(6),.axDocPaper td:nth-child(6){width:14%!important}
+.axPrintPaper th:nth-child(2),.axPrintPaper td:nth-child(2){width:39%!important}
+@media(max-width:600px){.axDocPaper,.axPrintPaper{padding:8px!important;font-size:10px!important}.axDocPaper header,.axPrintPaper .axPrintHeader{gap:8px!important}.axDocPaper header h1,.axPrintPaper .axPrintHeader h2{font-size:15px!important}.axDocPaper table,.axPrintPaper table{font-size:9px!important}.axDocPaper th,.axDocPaper td,.axPrintPaper th,.axPrintPaper td{padding:4px 2px!important}}
+@media print{.axDocPaper,.axPrintPaper{width:100%!important;max-width:100%!important;padding:0!important}.axDocPaper tr,.axPrintPaper tr{break-inside:avoid!important}}
