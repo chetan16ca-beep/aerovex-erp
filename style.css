@@ -34,3 +34,21 @@ body.axHasWatermark .modal:not(.hidden){display:grid;position:fixed;inset:0;z-in
 /* Spacious technical specification fields in quotations, invoices and challans */
 .axMncLine label:has([data-field="description"]),.axDocLine label:has([data-field="description"]){grid-column:1/-1!important}
 .axMncLine [data-field="description"],.axDocLine [data-field="description"],#axQuoteForm textarea[name="description"],.form textarea[name="description"]{display:block;width:100%!important;min-height:130px!important;padding:12px!important;font-size:15px!important;line-height:1.5!important;box-sizing:border-box!important}
+
+/* V34: responsive techno-commercial quotation preview and A4 print table */
+.axQuotePrint{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;padding:12px!important;font-size:11px!important;overflow-wrap:anywhere!important}
+.axQuotePrint header{display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr)!important;gap:18px!important;align-items:start!important;padding-bottom:14px!important;margin-bottom:15px!important;min-width:0!important}
+.axQuotePrint header>div{min-width:0!important;overflow-wrap:anywhere!important;line-height:1.55!important}
+.axQuotePrint header h1{font-size:18px!important;line-height:1.2!important;margin:0 0 10px!important}
+.axQuotePrint header h2{font-size:14px!important;line-height:1.25!important;margin:0 0 10px!important}
+.axQuotePrint table{table-layout:fixed!important;width:100%!important;min-width:0!important;border-collapse:collapse!important;font-size:10px!important}
+.axQuotePrint th,.axQuotePrint td{padding:6px 4px!important;overflow-wrap:anywhere!important;word-break:normal!important;vertical-align:top!important}
+.axQuotePrint th:nth-child(1),.axQuotePrint td:nth-child(1){width:5%!important}
+.axQuotePrint th:nth-child(2),.axQuotePrint td:nth-child(2){width:43%!important;white-space:normal!important}
+.axQuotePrint th:nth-child(3),.axQuotePrint td:nth-child(3){width:12%!important}
+.axQuotePrint th:nth-child(4),.axQuotePrint td:nth-child(4){width:8%!important}
+.axQuotePrint th:nth-child(5),.axQuotePrint td:nth-child(5){width:12%!important}
+.axQuotePrint th:nth-child(6),.axQuotePrint td:nth-child(6){width:8%!important}
+.axQuotePrint th:nth-child(7),.axQuotePrint td:nth-child(7){width:12%!important}
+@media(max-width:600px){.axQuotePrint{padding:8px!important;font-size:10px!important}.axQuotePrint header{gap:10px!important}.axQuotePrint header h1{font-size:15px!important}.axQuotePrint header h2{font-size:12px!important}.axQuotePrint table{font-size:9px!important}.axQuotePrint th,.axQuotePrint td{padding:4px 2px!important}}
+@media print{.axQuotePrint{padding:0!important}.axQuotePrint header{grid-template-columns:55% 45%!important}.axQuotePrint table{font-size:10px!important}}
