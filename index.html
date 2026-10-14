@@ -66,10 +66,19 @@ function gate(){
  document.documentElement.style.visibility='';
 }
 async function init(){
- let s;try{s=JSON.parse(sessionStorage.getItem(STORE)||'null')}catch(e){}
- if(s&&s.access_token&&await valid(s.access_token)){unlock(s);return}
- sessionStorage.removeItem(STORE);gate();
+ sessionStorage.removeItem(STORE);
+ gate();
 }
+function lockOnExit(){
+ session=null;
+ sessionStorage.removeItem(STORE);
+ document.body.classList.add('axAuthLocked');
+ if(!document.getElementById('axAuthGate'))gate();
+ const logout=document.getElementById('axLogout');
+ if(logout)logout.remove();
+}
+document.addEventListener('visibilitychange',function(){if(document.hidden)lockOnExit()});
+window.addEventListener('pagehide',lockOnExit);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();</script><script>
 (function(){
