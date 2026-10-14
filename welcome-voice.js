@@ -1,12 +1,18 @@
 (function(){
 function playWelcome(){
- if(!window.speechSynthesis)return;
+ if(!window.speechSynthesis){alert('Voice playback not supported in this browser. Try Chrome and enable Text-to-speech in phone settings.');return;}
  speechSynthesis.cancel();
  const speech=new SpeechSynthesisUtterance('भिऊ नकोस, मी तुझ्या पाठीशी आहे. श्री स्वामी समर्थ.');
  speech.lang='mr-IN';speech.rate=.85;speech.pitch=1.15;
  const voices=speechSynthesis.getVoices();
- speech.voice=voices.find(v=>v.lang.startsWith('mr')&&/female|swara|heera|pallavi/i.test(v.name))||voices.find(v=>v.lang.startsWith('mr'))||null;
+ const marathi=voices.filter(v=>/^mr/i.test(v.lang));
+ const hindi=voices.filter(v=>/^hi/i.test(v.lang));
+ const female=v=>/female|swara|heera|pallavi|kalpana|neerja|ananya/i.test(v.name);
+ speech.voice=marathi.find(female)||marathi[0]||hindi.find(female)||hindi[0]||null;
+ if(speech.voice)speech.lang=speech.voice.lang;
+ speech.onerror=function(ev){alert('Voice could not play ('+(ev.error||'unknown')+'). Check phone media volume and Text-to-speech settings.');};
  speechSynthesis.speak(speech);
+ setTimeout(()=>{if(speechSynthesis.paused)speechSynthesis.resume()},250);
 }
 function init(){
 
