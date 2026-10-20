@@ -46,8 +46,8 @@ function resolve(event){
  let origin=event.target;
  if(!origin||typeof origin.closest!=='function')origin=origin?.parentElement;
  if(!origin||typeof origin.closest!=='function')return null;
- if(origin.closest('#modal,#axAuthGate'))return null;
- const tile=origin.closest('#production .tile,#accounts .tile,#masters .tile');
+ if(origin.closest('#axAuthGate'))return null;
+ const tile=origin.closest('#production .tile,#accounts .tile,#masters .tile,#modal .tile');
  if(tile)return tile.querySelector('b')?.textContent?.trim()||null;
  const menu=origin.closest('#menu');
  if(menu){
@@ -56,6 +56,8 @@ function resolve(event){
   }
   return null;
  }
+ const hero=origin.closest('.axHeroActions button');
+ if(hero){const title=String(hero.textContent||'').replace(/^\+\s*/, '').trim();return title==='Pending Orders'||title==='New Work Order'||title==='New Quotation'?title:null;}
  const button=origin.closest('button[onclick], .axCFMNav button[onclick],#quick button[onclick]');
  if(!button)return null;
  const attr=button.getAttribute('onclick')||'';
