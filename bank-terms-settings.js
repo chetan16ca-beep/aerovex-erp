@@ -2,10 +2,13 @@
 (function(){
 'use strict';
 const e=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const defaults={bankName:'Karnataka Bank',accountName:'',accountNo:'',ifsc:'',branch:'',accountType:'',terms:''};
+const defaults={bankName:'Karnataka Bank',accountName:'AEROVEX FILTRATION',accountNo:'',ifsc:'KARB0000046',branch:'Ankleshwar',accountType:'',terms:''};
 const settings=()=>({...defaults,...((db.companySettings&&typeof db.companySettings==='object')?db.companySettings:{})});
 const line=(label,v)=>String(v||'').trim()?'<div><b>'+e(label)+':</b> '+e(v)+'</div>':'';
 function bank(s){
+ // Do not publish incomplete bank remittance instructions on customer PDFs.
+ // Keep verified branch defaults in Settings but suppress bank section until account no. exists.
+ if(!String(s.accountNo||'').trim())return '';
  let result=line('Bank',s.bankName)+line('Account Holder',s.accountName)+line('Account No.',s.accountNo)+line('IFSC',s.ifsc)+line('Branch',s.branch)+line('Account Type',s.accountType);
  return result?'<section class="axBankInfo"><h3>Bank Details</h3>'+result+'</section>':'';
 }
@@ -51,7 +54,7 @@ window.axBankTermsSettings=function(){
  const input=(key,label,attrs='')=>'<label>'+label+'<input name="'+key+'" value="'+e(s[key])+'" '+attrs+'></label>';
  show('Bank Details & Terms Settings',
  '<form id="axBankTermsForm" class="form">'+
- '<div class="full"><h3>Bank Details</h3><p>Bank name is Karnataka Bank. Enter your actual account details after checking your passbook or cheque.</p></div>'+
+ '<div class="full"><h3>Bank Details</h3><p>Karnataka Bank (Ankleshwar) branch and IFSC are prefilled from public branch records. Verify your actual branch and account number from your passbook or cheque. Until the account number is saved, bank transfer instructions are not printed on customer documents.</p></div>'+
  input('bankName','Bank Name','required maxlength="90"')+
  input('accountName','Account Holder Name','maxlength="100"')+
  input('accountNo','Account Number','inputmode="numeric" maxlength="28" autocomplete="off"')+
