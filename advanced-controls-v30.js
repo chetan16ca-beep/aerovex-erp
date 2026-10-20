@@ -9,7 +9,7 @@ const N=x=>{const n=Number(x);return Number.isFinite(n)?n:0};
 const R=x=>Math.round((N(x)+Number.EPSILON)*100)/100;
 const F=x=>'₹'+R(x).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const A=k=>Array.isArray(db[k])?db[k]:[];
-const T=()=>new Date().toLocaleDateString('en-CA');
+const T=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const U=()=>new Date().toISOString();
 const ID=p=>p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const str=x=>String(x??'').trim();
