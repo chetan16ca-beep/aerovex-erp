@@ -3,21 +3,21 @@
 (function(){
 'use strict';
 const routing={
- 'Work Orders':()=>window.axWOOverview?.()||window.openModule('Work Orders'),
- 'New Work Order':()=>window.axWOEdit?.()||window.openModule('New Work Order'),
- 'Pending Orders':()=>window.axWOOverview?.()||window.openModule('Pending Orders'),
- 'Sales Billing Flow':()=>window.axOpenSalesBilling?.()||window.openModule('Sales Billing Flow'),
- 'Sales Order to Work Orders':()=>window.axSOCreateWorkOrders?.()||window.openModule('Sales Order to Work Orders'),
- 'Bank & Terms Settings':()=>window.axBankTermsSettings?.()||window.openModule('Bank & Terms Settings'),
- 'Quotation':()=>window.axCorporateQuotation?.()||window.openModule('Quotation'),
- 'New Quotation':()=>window.axCorporateQuotation?.()||window.openModule('New Quotation'),
- 'Sales Order / PO':()=>window.axDetailedDocument?.('Sales Order / PO')||window.openModule('Sales Order / PO'),
- 'Delivery Challan':()=>window.axDetailedDocument?.('Delivery Challan')||window.openModule('Delivery Challan'),
- 'Sales Invoice':()=>window.axDetailedDocument?.('Sales Invoice')||window.openModule('Sales Invoice'),
- 'Purchase Order':()=>window.axDetailedDocument?.('Purchase Order')||window.openModule('Purchase Order'),
- 'Purchase':()=>window.axDetailedDocument?.('Purchase')||window.openModule('Purchase'),
- 'Reports':()=>window.axPlantReports?.()||window.openModule('Reports'),
- 'Plant Head Work List':()=>window.axPlantReports?.()||window.openModule('Plant Head Work List')
+ 'Work Orders':()=>(typeof window.axWOOverview==='function'?window.axWOOverview():window.openModule('Work Orders')),
+ 'New Work Order':()=>(typeof window.axWOEdit==='function'?window.axWOEdit():window.openModule('New Work Order')),
+ 'Pending Orders':()=>(typeof window.axWOOverview==='function'?window.axWOOverview():window.openModule('Pending Orders')),
+ 'Sales Billing Flow':()=>(typeof window.axOpenSalesBilling==='function'?window.axOpenSalesBilling():window.openModule('Sales Billing Flow')),
+ 'Sales Order to Work Orders':()=>(typeof window.axSOCreateWorkOrders==='function'?window.axSOCreateWorkOrders():window.openModule('Sales Order to Work Orders')),
+ 'Bank & Terms Settings':()=>(typeof window.axBankTermsSettings==='function'?window.axBankTermsSettings():window.openModule('Bank & Terms Settings')),
+ 'Quotation':()=>(typeof window.axCorporateQuotation==='function'?window.axCorporateQuotation():window.openModule('Quotation')),
+ 'New Quotation':()=>(typeof window.axCorporateQuotation==='function'?window.axCorporateQuotation():window.openModule('New Quotation')),
+ 'Sales Order / PO':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Sales Order / PO'):window.openModule('Sales Order / PO')),
+ 'Delivery Challan':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Delivery Challan'):window.openModule('Delivery Challan')),
+ 'Sales Invoice':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Sales Invoice'):window.openModule('Sales Invoice')),
+ 'Purchase Order':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Purchase Order'):window.openModule('Purchase Order')),
+ 'Purchase':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Purchase'):window.openModule('Purchase')),
+ 'Reports':()=>(typeof window.axPlantReports==='function'?window.axPlantReports():window.openModule('Reports')),
+ 'Plant Head Work List':()=>(typeof window.axPlantReports==='function'?window.axPlantReports():window.openModule('Plant Head Work List'))
 };
 const extra={};
 function displayError(message){
