@@ -1,6 +1,6 @@
 /* AEROVEX FILTRATION — per-invoice commission, expenses & profit.
  * Existing invoices, vouchers, stock and expense register are never edited by this module.
- * Commission accrues on GST-exclusive taxable sale (or positive job margin if selected).
+ * Commission is always calculated on GST-exclusive taxable sales, never profit margin.
  */
 (function(){
 'use strict';
@@ -42,9 +42,11 @@ function calculate(invoice,record){
  const costs=Object.fromEntries(costNames.map(k=>[k,round(record?.[k]||0)]));
  const cost=round(Object.values(costs).reduce((a,b)=>a+b,0));
  const rate=n(record?.rate);
- const basis=record?.basis==='margin'?'margin':'sales';
+ // User-required rule: commission ALWAYS uses taxable sale excluding GST.
+ // Legacy basis selections are kept in stored data, but do not change calculation.
+ const basis='sales';
  const marginBeforeCommission=round(taxable-cost);
- const commissionBase=basis==='margin'?Math.max(0,marginBeforeCommission):Math.max(0,taxable);
+ const commissionBase=Math.max(0,taxable);
  const commission=record?.agentId?round(commissionBase*rate/100):0;
  const paid=round(record?.paidAmount||0);
  const due=round(Math.max(0,commission-paid));
@@ -94,12 +96,14 @@ function screen(){
  '<div class="axCommissionSummary"><div><small>Net Sales (excl. GST)</small><strong>'+cash(summary.taxable)+'</strong></div>'+
  '<div><small>Total Commission Due/Accrued</small><strong>'+cash(summary.commission)+'</strong></div>'+
  '<div><small>Commission Paid / Remaining</small><strong>'+cash(summary.paid)+' / '+cash(summary.due)+'</strong></div>'+
- '<div><small>Indicative Company P&L</small><strong>'+cash(summary.estimatedCompanyProfit)+'</strong></div></div>'+
+ '<div><small>Purchase Costs (all saved, excl. GST)</small><strong>'+cash(summary.purchases)+'</strong></div>'+
+ '<div><small>Other Expense Register</small><strong>'+cash(summary.expenses)+'</strong></div>'+
+ '<div><small>Estimated Net Profit (after commission)</small><strong>'+cash(summary.estimatedCompanyProfit)+'</strong></div></div>'+
  '<p class="axCommissionNote">Company P&L = sales excl. GST − recorded Purchase taxable values − general Expense Register − commission. This is indicative: purchases may include inventory; job-specific costs are shown separately, not subtracted again in company P&L to avoid double counting.</p>'+
  '<section class="axCommissionPanel"><h3>Commission Person Master</h3>'+
  '<form id="axCommissionAgentForm" class="form"><label>Person Name<input name="name" required maxlength="110" placeholder="Enter commission person"></label>'+
  '<label>Default Commission %<input name="rate" type="number" min="0" max="100" step="0.01" value="15" required></label>'+
- '<label class="full">Commission Based On<select name="basis"><option value="sales">Taxable Sales (excluding GST)</option><option value="margin">Positive Job Margin (after direct costs)</option></select></label>'+
+ '<p class="axCommissionNote">Commission basis is fixed: Invoice Taxable Sale (GST excluded). Example: taxable ₹10,000 × 15% = ₹1,500.</p>'+
  '<div class="full"><button class="primary" type="submit" id="axAgentSave">Save Person & Commission %</button> <button type="button" id="axAgentClear">Clear</button></div></form>'+
  '<div id="axAgentRows">'+masterOptions()+'</div></section>'+
  '<section class="axCommissionPanel"><h3>Invoice Commission & Profit</h3>'+
@@ -113,8 +117,8 @@ function screen(){
  const form=document.getElementById('axCommissionAgentForm');
  form.onsubmit=e=>{
   e.preventDefault();const fd=Object.fromEntries(new FormData(form));
-  const name=clean(fd.name),rate=Number(fd.rate),basis=fd.basis;
-  if(!name||!Number.isFinite(rate)||rate<0||rate>100||!['sales','margin'].includes(basis))return alert('Enter valid Person, rate 0–100% and basis.');
+  const name=clean(fd.name),rate=Number(fd.rate),basis='sales';
+  if(!name||!Number.isFinite(rate)||rate<0||rate>100)return alert('Enter valid Person and commission rate 0–100%.');
   const existing=agents();
   if(existing.some(a=>a.name.trim().toUpperCase()===name.toUpperCase()&&a.id!==editingAgent))return alert('This commission person is already saved. Edit that person instead.');
   const next=JSON.parse(JSON.stringify(existing));
@@ -133,7 +137,7 @@ function screen(){
  for(const b of document.querySelectorAll('#axAgentRows [data-agent]'))b.onclick=()=>{
   const a=findAgent(b.dataset.agent);if(!a)return;
   editingAgent=a.id;
-  for(const key of ['name','rate','basis'])form.elements.namedItem(key).value=a[key];
+  for(const key of ['name','rate'])form.elements.namedItem(key).value=a[key];
   document.getElementById('axAgentSave').textContent='Update Commission Person';
   form.scrollIntoView({block:'center',behavior:'smooth'});
  };
@@ -155,8 +159,7 @@ function invoiceEditor(){
  '<p>Bill Value '+cash(n(inv.total??inv.amount))+' | GST '+cash(n(inv.gst))+' | Taxable Sale '+cash(baseSale(inv))+'</p></div>'+
  '<form id="axCommissionInvoiceForm" class="form"><label>Commission Person<select name="agentId" id="axInvoiceAgent">'+agentOptions(old.agentId||'')+'</select></label>'+
  '<label>Commission %<input name="rate" type="number" min="0" max="100" step="0.01" value="'+n(old.rate??findAgent(old.agentId)?.rate??0)+'"></label>'+
- '<label class="full">Commission Basis<select name="basis"><option value="sales" '+(old.basis!=='margin'?'selected':'')+'>Taxable Sales (excluding GST)</option>'+
- '<option value="margin" '+(old.basis==='margin'?'selected':'')+'>Positive Job Margin (after direct costs)</option></select></label>'+
+ '<p class="axCommissionNote">Commission is calculated only on taxable sale excluding GST (not on gross bill or job margin).</p>'+
  showCost('material','Material / Purchase Cost')+showCost('labour','Labour / Manufacturing Cost')+
  showCost('freight','Transport / Freight Cost')+showCost('other','Packing / Other Direct Expense')+
  '<label>Commission Paid (₹)<input name="paidAmount" type="number" min="0" step="0.01" value="'+n(old.paidAmount)+'"></label>'+
@@ -166,12 +169,12 @@ function invoiceEditor(){
  '<div class="full"><button class="primary" type="submit">Save Commission & Expense</button><p class="axCommissionNote">'+esc(message)+'</p></div></form>';
  const form=document.getElementById('axCommissionInvoiceForm');
  const agent=form.elements.namedItem('agentId');
- agent.onchange=()=>{const found=findAgent(agent.value);form.elements.namedItem('rate').value=found?found.rate:0;form.elements.namedItem('basis').value=found?.basis||'sales';preview()};
+ agent.onchange=()=>{const found=findAgent(agent.value);form.elements.namedItem('rate').value=found?found.rate:0;preview()};
  form.addEventListener('input',preview);
  form.addEventListener('change',preview);
  function draft(){
   const f=Object.fromEntries(new FormData(form));
-  return {agentId:f.agentId,rate:f.rate,basis:f.basis,paidAmount:f.paidAmount,
+  return {agentId:f.agentId,rate:f.rate,basis:'sales',paidAmount:f.paidAmount,
    costConfirmed:!!f.costConfirmed,material:f.material,labour:f.labour,freight:f.freight,other:f.other,note:f.note};
  }
  function preview(){
@@ -179,7 +182,7 @@ function invoiceEditor(){
   document.getElementById('axInvoiceProfitPreview').innerHTML=
    '<div class="axCommissionCalc"><p>Sales excluding GST: <b>'+cash(d.taxable)+'</b></p>'+
    '<p>Material + Labour + Freight + Other: <b>− '+cash(d.cost)+'</b></p>'+
-   '<p>Commission: <b>− '+cash(d.commission)+'</b> ('+d.rate+'% of '+(d.basis==='sales'?'taxable sales':'positive job margin')+')</p>'+
+   '<p>Commission: <b>− '+cash(d.commission)+'</b> ('+d.rate+'% of taxable sales, excluding GST)</p>'+
    '<p class="axCommissionProfit">Your Estimated Job Profit: <b>'+cash(d.profit)+'</b></p>'+
    '<p>Commission Paid: '+cash(d.paid)+' | Balance Payable: '+cash(d.due)+'</p>'+
    (!draft().costConfirmed?'<small>Profit is provisional until you tick Cost Confirmed.</small>':'')+'</div>';
@@ -188,7 +191,7 @@ function invoiceEditor(){
   e.preventDefault();const draftRecord=draft(),rate=Number(draftRecord.rate),paid=Number(draftRecord.paidAmount);
   if(!Number.isFinite(rate)||rate<0||rate>100)return alert('Commission rate must be 0–100%.');
   for(const field of [...costNames,'paidAmount'])if(!Number.isFinite(Number(draftRecord[field]))||Number(draftRecord[field])<0)return alert('Invalid '+field+'. Negative expense/paid amount is not allowed.');
-  if(!['sales','margin'].includes(draftRecord.basis))return alert('Select a valid commission basis.');
+  if(draftRecord.basis!=='sales')return alert('Commission must be based on taxable sales excluding GST.');
   if(draftRecord.agentId&&!findAgent(draftRecord.agentId))return alert('Commission person missing. Reopen person master.');
   if(!draftRecord.agentId&&rate!==0)return alert('Choose commission person or set commission to 0%.');
   const d=calculate(inv,draftRecord);
