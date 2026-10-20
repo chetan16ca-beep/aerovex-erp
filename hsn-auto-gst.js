@@ -10,6 +10,14 @@ const rupees=n=>'₹'+num(n).toLocaleString('en-IN',{minimumFractionDigits:2,max
 function ensure(){
  if(!Array.isArray(db.hsnTaxMaster))db.hsnTaxMaster=[];
  // Source: Notification 09/2025-Central Tax (Rate), Schedule II, entry 179.
+ // Verified 56th GST Council rate changes (effective Sep 22, 2025).
+ // These heading-level rules apply only when the product is correctly classified.
+ const verified=[
+  {hsn:'5911',rate:5,description:'Textile products & articles for technical use (including qualifying filter cloth / bags)',source:'GST Council 56th Meeting, Annexure II, Textile Sector: 5911, 12% to 5%',verifiedOn:'2026-10-20'},
+  {hsn:'8421',rate:18,description:'Filtering or purifying machinery and apparatus for liquids or gases',source:'Notification 09/2025-Central Tax (Rate), Schedule II: 8421',verifiedOn:'2026-10-20'}
+ ];
+ const missing=verified.filter(x=>!db.hsnTaxMaster.some(y=>code(y.hsn)===x.hsn));
+ if(missing.length){db.hsnTaxMaster.push(...missing);try{save()}catch(error){console.warn('Could not seed verified HSN rates',error)}}
  if(!db.hsnTaxMaster.some(x=>code(x.hsn)==='48120000')){
   db.hsnTaxMaster.push({hsn:'48120000',rate:18,description:'Filter blocks, slabs and plates of paper pulp (verify pad classification)',source:'CBIC 09/2025-CT(R), Schedule II entry 179',verifiedOn:'2026-10-20'});
   save();
@@ -21,7 +29,9 @@ window.axHSNLookup=function(value){
  const list=db.hsnTaxMaster.filter(x=>x&&Number.isFinite(Number(x.rate))&&code(x.hsn));
  const exact=list.find(x=>code(x.hsn)===h);
  if(exact)return exact;
- const fits=list.filter(x=>{const y=code(x.hsn);return (h.length>y.length&&h.startsWith(y))||(h.length===4&&y.startsWith(h))});
+ // A broad heading can cover longer codes; never infer a heading rate from
+ // one narrower 8-digit record because other subcodes can differ.
+ const fits=list.filter(x=>{const y=code(x.hsn);return h.length>y.length&&h.startsWith(y)});
  fits.sort((a,b)=>code(b.hsn).length-code(a.hsn).length);
  return fits[0]||null;
 };
