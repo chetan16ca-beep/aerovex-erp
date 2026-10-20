@@ -60,7 +60,7 @@ function create(){
   return {i,qty};
  });
  if(!selected.length)return alert('Select at least one item.');
- if(selected.some(x=>!Number.isInteger(x.i)||!Number.isFinite(x.qty)||x.qty<=0||x.qty>state.rows[x.i].left+0.000001))return alert('Verify quantity against pending quantity.');
+ if(selected.some(x=>!Number.isInteger(x.i)||!state.rows[x.i]||!Number.isFinite(x.qty)||x.qty<=0||x.qty>state.rows[x.i].left+0.000001))return alert('Verify quantity against pending quantity.');
  if(!confirm('Create '+selected.length+' separate Work Orders for '+id(order)+'?'))return;
  const fresh=allocations(order,chosen);
  if(fresh.errors.length||selected.some(x=>x.qty>fresh.rows[x.i].left+0.000001))return alert('Order changed. Reopen and review.');
@@ -74,7 +74,11 @@ function create(){
  const next=JSON.parse(JSON.stringify(db));
  if(!Array.isArray(next.workOrders))next.workOrders=[];
  next.workOrders.push(...newWorks);
- if(new Set(next.workOrders.map(w=>String(w.workNo||'').toUpperCase())).size!==next.workOrders.length)return alert('Duplicate Work No detected; nothing saved.');
+ // Check that newly generated IDs are unique without blocking conversion because of unrelated legacy duplicates.
+ const previousIds=new Set(works().map(w=>String(w.workNo||'').trim().toUpperCase()));
+ const newIds=newWorks.map(w=>String(w.workNo||'').trim().toUpperCase());
+ if(new Set(newIds).size!==newIds.length||newIds.some(no=>previousIds.has(no)))
+  return alert('Duplicate new Work No detected; nothing saved.');
  try{localStorage.setItem(KEY,JSON.stringify(next))}catch(error){return alert('Not saved: '+error.message)}
  if(!Array.isArray(db.workOrders))db.workOrders=[];
  db.workOrders.push(...newWorks);
