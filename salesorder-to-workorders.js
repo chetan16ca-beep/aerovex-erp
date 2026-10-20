@@ -96,5 +96,24 @@ window.axDocPreview=function(type,index){
  }
  return response;
 };
+const oldBilling=window.axOpenSalesBilling;
+if(typeof oldBilling==='function'){
+ window.axOpenSalesBilling=function(){
+  const result=oldBilling.apply(this,arguments);
+  const row=document.getElementById('axFlowOrderRows');
+  if(row&&!document.getElementById('axSOFlowWOShortcut')){
+   const button=document.createElement('button');
+   button.id='axSOFlowWOShortcut';button.type='button';button.className='primary';
+   button.textContent='Create Individual Production Work Orders';
+   button.style.margin='10px 0';
+   button.onclick=()=>{
+    const pick=document.getElementById('axFlowSO')?.value;
+    window.axSOCreateWorkOrders(pick===''||pick==null?undefined:Number(pick));
+   };
+   row.parentNode.insertBefore(button,row);
+  }
+  return result;
+ };
+}
 try{render()}catch(error){}
 })();
