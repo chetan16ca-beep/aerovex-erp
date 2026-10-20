@@ -48,7 +48,7 @@ function mergeBlank(existing,source){
 }
 function addOrFill(c){
  if(!c?.name)return false;
- if(!Array.isArray(db.parties))db.parties=[];
+ if(!Array.isArray(db.parties)){console.warn('Customer Master has an unexpected format: no records changed');return false}
  const index=find(c);
  if(index>=0){
   const p=db.parties[index];
@@ -61,7 +61,7 @@ function addOrFill(c){
 }
 function syncBills(){
  const invoices=Array.isArray(db.invoices)?db.invoices:[];
- if(!invoices.length)return 0;
+ if(!invoices.length||!Array.isArray(db.parties))return 0;
  let before=JSON.stringify(all()),added=0;
  const snapshot=JSON.parse(before);
  for(const invoice of invoices)if(addOrFill(billCustomer(invoice)))added++;
@@ -149,7 +149,7 @@ function master(searchTerm=''){
   c.gstin=c.gstin.toUpperCase();
   if(!c.name)return alert('Enter Customer Name.');
   if(c.gstin&&!/^[0-9]{2}[A-Z0-9]{13}$/.test(c.gstin))return alert('Verify 15-character GSTIN or leave blank.');
-  if(!Array.isArray(db.parties))db.parties=[];
+  if(!Array.isArray(db.parties))return alert('Customer Master data needs checking. No records changed. Download an ERP backup first.');
   const index=editing!==null?editing:find(c);
   const snapshot=JSON.parse(JSON.stringify(all()));
   if(index>=0){
