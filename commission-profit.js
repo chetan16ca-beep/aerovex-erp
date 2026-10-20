@@ -82,12 +82,12 @@ function persistCollection(field,next){
  db[field]=next;
  try{save();return true}catch(e){db[field]=prior;alert('Nothing saved: '+e.message);return false}
 }
-const message='Commission is an accrued business expense, even if not yet paid. Recording a paid amount here does not transfer money, post a bank transaction, or add another Expense Voucher.';
+const message='Commission accrues on GST-exclusive sales even before payment. Setting Paid here only tracks status; it does not transfer money or create another Expense Voucher.';
 function agentOptions(selected){
  return '<option value="">No commission person</option>'+agents().map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?'selected':'')+'>'+esc(x.name)+' ('+n(x.rate)+'%)</option>').join('');
 }
 function masterOptions(){
- return agents().map(a=>'<div class="axCommissionRow"><div><b>'+esc(a.name)+'</b><small>'+n(a.rate)+'% on '+(a.basis==='margin'?'positive job margin':'taxable sales (excl. GST)')+'</small></div><button type="button" data-agent="'+esc(a.id)+'">Edit</button></div>').join('')||'<p>No commission person saved yet.</p>';
+ return agents().map(a=>'<div class="axCommissionRow"><div><b>'+esc(a.name)+'</b><small>'+n(a.rate)+'% on '+'taxable sales (excl. GST)'+'</small></div><button type="button" data-agent="'+esc(a.id)+'">Edit</button></div>').join('')||'<p>No commission person saved yet.</p>';
 }
 let editingAgent=null,selectedInvoice=null;
 function screen(){
@@ -231,7 +231,7 @@ if(typeof oldPreview==='function')window.axDocPreview=function(type,i){
  return result;
 };
 const css=document.createElement('style');
-css.textContent='.axCommissionPanel{padding:14px;border:1px solid #dce8ee;background:#f9fcff;margin:14px 0;border-radius:12px}.axCommissionPanel h3{margin:0 0 12px}.axCommissionRow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid #dce8ee}.axCommissionRow small{display:block;color:#637787;font-size:12px}.axCommissionRow button{flex-shrink:0}.axCommissionRow span{text-align:right}.axCommissionSummary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.axCommissionSummary>div{border:1px solid #d7e5ea;border-radius:10px;padding:11px;background:#fff;min-width:0}.axCommissionSummary small{display:block;color:#627887;font-size:11px}.axCommissionSummary strong{font-size:16px;display:block;margin-top:4px;overflow-wrap:anywhere}.axCommissionNote{color:#647889;font-size:12px;line-height:1.55}.axCommissionWarning{color:#a12612;font-weight:700}.axCommissionInvoiceHead{background:#edf8fb;border-radius:9px;padding:12px;margin:12px 0}.axCommissionInvoiceHead p{margin:6px 0;font-size:12px}.axCommissionCalc{border:1px solid #c5dfe9;background:#eef8fb;padding:10px;border-radius:10px}.axCommissionCalc p{margin:6px 0}.axCommissionProfit{font-weight:800;font-size:16px;color:#12526b;border-top:1px solid #b7d2d8;padding-top:12px}@media(max-width:650px){.axCommissionSummary{grid-template-columns:1fr 1fr}.axCommissionSummary strong{font-size:13px}}';
+css.textContent='.axCommissionPanel{padding:14px;border:1px solid #dce8ee;background:#f9fcff;margin:14px 0;border-radius:12px}.axCommissionPanel h3{margin:0 0 12px}.axCommissionRow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid #dce8ee}.axCommissionRow small{display:block;color:#637787;font-size:12px}.axCommissionRow button{flex-shrink:0}.axCommissionRow span{text-align:right}.axCommissionSummary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.axCommissionSummary>div{border:1px solid #d7e5ea;border-radius:10px;padding:11px;background:#fff;min-width:0}.axCommissionSummary small{display:block;color:#627887;font-size:11px}.axCommissionSummary strong{font-size:16px;display:block;margin-top:4px;overflow-wrap:anywhere}.axCommissionNote{color:#647889;font-size:12px;line-height:1.55}.axCommissionWarning{color:#a12612;font-weight:700}.axCommissionInvoiceHead{background:#edf8fb;border-radius:9px;padding:12px;margin:12px 0}.axCommissionInvoiceHead p{margin:6px 0;font-size:12px}.axCommissionPanel input[type=checkbox]{width:18px!important;height:18px!important;vertical-align:middle}.axCommissionCalc{border:1px solid #c5dfe9;background:#eef8fb;padding:10px;border-radius:10px}.axCommissionCalc p{margin:6px 0}.axCommissionProfit{font-weight:800;font-size:16px;color:#12526b;border-top:1px solid #b7d2d8;padding-top:12px}@media(max-width:650px){.axCommissionSummary{grid-template-columns:1fr 1fr}.axCommissionSummary strong{font-size:13px}}';
 document.head.append(css);
 try{render()}catch(error){console.warn('Commission module menu render',error)}
 })();
