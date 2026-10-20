@@ -12,8 +12,16 @@ const date=()=>new Date().toLocaleDateString('en-CA');
 const items=x=>Array.isArray(x?.items)?x.items:[];
 const same=(a,b)=>norm(a?.description)===norm(b?.description)&&norm(a?.size)===norm(b?.size)&&norm(a?.hsn)===norm(b?.hsn);
 const linkMatches=(doc,source,index,from)=>{
- if(from==='order')return doc.sourceSalesOrder===ident(source)&&!!ident(source) || doc.sourceSalesOrderIndex===index&&Number.isInteger(doc.sourceSalesOrderIndex);
- return doc.sourceChallan===ident(source)&&!!ident(source) || doc.sourceChallanIndex===index&&Number.isInteger(doc.sourceChallanIndex);
+ const id=ident(source);
+ if(from==='order'){
+  if(doc.sourceSalesOrder)return !!id&&doc.sourceSalesOrder===id;
+  return Number.isInteger(doc.sourceSalesOrderIndex)&&doc.sourceSalesOrderIndex===index;
+ }
+ if(doc.sourceChallan)return !!id&&doc.sourceChallan===id;
+ if(Number.isInteger(doc.sourceChallanIndex))return doc.sourceChallanIndex===index;
+ // Legacy challan-to-bill form may have saved the original challan only in its reference.
+ const ref=String(doc.ref||'').trim();
+ return !!id&&(ref===id||ref.startsWith(id+' / '))&&String(doc.remarks||'').includes('Against Delivery Challan '+id);
 };
 function remaining(source,index,from){
  const originals=items(source),records=arr(from==='order'?'challans':'invoices');
