@@ -28,6 +28,15 @@ function billCustomer(invoice){
  const c=customer(invoice);
  if(!c.name)return null;
  if(invoice.status==='Cancelled'||invoice.cancelled===true||invoice.isDemo===true)return null;
+ // Backfill missing invoicing fields from matching existing sales/quotation documents.
+ for(const key of ['salesOrders','quotations','challans']){
+  for(const item of (Array.isArray(db[key])?db[key]:[])){
+   const candidate=customer(item);
+   const isSame=norm(candidate.name)===norm(c.name)&&(!candidate.gstin||!c.gstin||norm(candidate.gstin)===norm(c.gstin));
+   if(!isSame)continue;
+   for(const field of ['gstin','address','phone','email','attention','place'])if(!c[field]&&candidate[field])c[field]=candidate[field];
+  }
+ }
  return c;
 }
 function mergeBlank(existing,source){
@@ -82,6 +91,15 @@ function bind(form){
  form.dataset.axCustomerBound='1';
  const parent=input.closest('label')||input.parentNode;
  if(!parent)return;
+ // The older Tally invoice form had no address field; add it before customer selection.
+ if(form.id==='inv'&&!form.elements.namedItem('address')){
+  const address=document.createElement('label');
+  address.className='full';
+  address.textContent='Customer Billing Address';
+  const textarea=document.createElement('textarea');
+  textarea.name='address';textarea.rows=3;textarea.placeholder='Auto-filled from Customer Master';
+  address.appendChild(textarea);parent.after(address);
+ }
  const label=document.createElement('label');
  label.className='axCustomerPicker';label.textContent='Choose Saved Customer (auto-fill)';
  const select=document.createElement('select');
@@ -164,7 +182,7 @@ function start(){
  // Invoice creation by any existing form or Sales Order → Challan → Invoice conversion.
  document.addEventListener('submit',event=>{
   const form=event.target;
-  if(form?.matches?.('#axDocForm')&&/INVOICE/i.test(document.querySelector('#modalBody > h2')?.textContent||''))setTimeout(syncBills,0);
+  if(form?.matches?.('#inv')||(form?.matches?.('#axDocForm')&&/INVOICE/i.test(document.querySelector('#modalBody > h2')?.textContent||'')))setTimeout(syncBills,0);
  },false);
  const oldPreview=window.axDocPreview;
  if(typeof oldPreview==='function')window.axDocPreview=function(type){
