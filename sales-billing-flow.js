@@ -122,7 +122,7 @@ function renderChallan(){
  const options=['CGST+SGST','IGST','Exempt'].map(x=>'<option value="'+x+'" '+(tax===x?'selected':'')+'>'+x+'</option>').join('');
  root.innerHTML=state.html+(state.pending.length&&!state.problems.length?
  '<label>Tax Type<select id="axFlowTaxType"><option value="">Select GST Type</option>'+options+'</select></label>'+
- '<label>GST Rate % (verify HSN)<input id="axFlowGSTRate" type="number" min="0" max="100" step="any" value="'+esc(rate)+'" placeholder="Enter correct GST rate"></label>'+
+ '<p class="axFlowHelp">GST rate automatic per item HSN; different items may have different rates.</p>'+
  '<button class="primary" type="button" id="axFlowMakeINV">Create GST Invoice / Bill</button>':'')+
  '<p class="axFlowHelp">Invoice quantities cannot exceed the selected Challan. Confirm GSTIN, HSN, tax type and rate before billing.</p>';
  document.getElementById('axFlowMakeINV')?.addEventListener('click',()=>convert('challan',selectedChallan));
@@ -139,21 +139,21 @@ function convert(kind,index){
  if(!selected.length)return alert('Enter at least one quantity above zero.');
  const key=kind==='order'?'challans':'invoices',prefix=kind==='order'?'AFX/DC':'AFX/INV';
  const number=nextNumber(prefix,key),srcNo=ident(source),taxType=kind==='order'?source.taxType:document.getElementById('axFlowTaxType')?.value;
- const taxRate=kind==='order'?source.gstRate:document.getElementById('axFlowGSTRate')?.value;
+ const taxRate=source.gstRate??'';
  if(kind==='challan'&&(!taxType||!['CGST+SGST','IGST','Exempt'].includes(taxType)))return alert('Choose GST tax type before creating the bill.');
- if(kind==='challan'&&taxType!=='Exempt'&&(taxRate===''||!Number.isFinite(Number(taxRate))||Number(taxRate)<0||Number(taxRate)>100))return alert('Enter and verify the GST percentage.');
+ /* Each tax rate is resolved using its product HSN. */
  const docItems=selected.map(x=>{
   const orig=items(source)[x.j];
   return {...orig,qty:x.qty,sourceLine:x.j,...(kind==='challan'?{sourceSalesOrderLine:orig.sourceLine}: {})};
  });
- const taxable=docItems.reduce((sum,z)=>sum+val(z.qty)*val(z.rate)*(1-val(z.discount)/100),0);
- const gst=taxType==='Exempt'?0:taxable*val(taxRate)/100;
+ const tax=window.axHSNApplyLines(docItems,taxType||'CGST+SGST');if(!tax.ok)return alert(tax.error);
+ const taxable=tax.taxable,gst=tax.gst;
  const confirmed=kind==='order'?'Create Delivery Challan '+number+' from Sales Order '+srcNo+'?':'Create GST Invoice '+number+' from Challan '+srcNo+'? Check customer, HSN, rates and GST first.';
  if(!confirm(confirmed))return;
  // Recheck remaining just before writing; never overwrite the old ERP database.
  const fresh=remaining(source,index,kind);
  if(fresh.problems.length||selected.some(x=>x.qty>fresh.rows[x.j]?.pending+.00001))return alert('Quantities changed. Reopen and check the original document.');
- const result={...source,documentNo:number,date:date(),items:docItems,taxType:taxType||'',gstRate:taxRate??'',taxable,gst,total:taxable+gst,amount:taxable+gst,remarks:source.remarks||''};
+ const result={...source,documentNo:number,date:date(),items:tax.items,taxType:taxType||'CGST+SGST',gstRate:tax.gstRate,gstBreakup:tax.gstBreakup,cgst:tax.cgst,sgst:tax.sgst,igst:tax.igst,taxable,gst,total:tax.total,amount:tax.amount,remarks:source.remarks||''};
  if(kind==='order'){
   delete result.invoiceNo;
   result.sourceSalesOrder=srcNo;result.sourceSalesOrderIndex=index;
