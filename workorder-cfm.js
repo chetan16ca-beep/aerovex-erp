@@ -13,8 +13,8 @@ const actualCutting=w=>{
  const rows=cutRows(w);
  if(!rows.length)return '<section class="axWOActual"><h4>Actual Cloth / SRL Used</h4><p>No cutting entry recorded for this Work No. Preferred SRL is not actual used SRL.</p></section>';
  const total=rows.reduce((sum,x)=>sum+num(x.qty),0);
- const body=rows.map(x=>'<tr><td>'+E(x.date||'—')+'</td><td>'+E(x.description||'—')+'</td><td>'+E(x.cloth||'Not recorded')+'</td><td>'+E(x.width||'—')+'</td><td><b>'+E(x.srl||'Not recorded')+'</b></td><td>'+num(x.qty)+'</td><td>'+E(x.meter==null?'—':x.meter)+'</td></tr>').join('');
- return '<section class="axWOActual"><h4>Actual Cloth / SRL Used — '+rows.length+' entries, Cut Qty '+total+'</h4><div class="axWOTableWrap"><table class="axWOTable"><thead><tr><th>Cut Date</th><th>Product</th><th>Actual Cloth</th><th>Width</th><th>Actual SRL</th><th>Cut Qty</th><th>Meter</th></tr></thead><tbody>'+body+'</tbody></table></div><small>Read directly from Cutting Register; preferred SRL shown above is only a plan.</small></section>';
+ const body=rows.map(x=>'<tr><td>'+E(x.date||'—')+'</td><td>'+E(x.description||'—')+'</td><td>'+E(x.cloth||'Not recorded')+'</td><td>'+E(x.width||'—')+'</td><td><b>'+E(x.srl||'Not recorded')+'</b></td><td>'+num(x.qty)+'</td><td>'+E(x.meter==null?'—':x.meter)+'</td><td>'+E(x.clothSource||'Older entry: verify cloth')+'</td></tr>').join('');
+ return '<section class="axWOActual"><h4>Actual Cloth / SRL Used — '+rows.length+' entries, Cut Qty '+total+'</h4><div class="axWOTableWrap"><table class="axWOTable"><thead><tr><th>Cut Date</th><th>Product</th><th>Actual Cloth</th><th>Width</th><th>Actual SRL</th><th>Cut Qty</th><th>Meter</th><th>Cloth Source</th></tr></thead><tbody>'+body+'</tbody></table></div><small>Read from Cutting Register. Old records may contain planned cloth; check actual roll for older entries.</small></section>';
 };
 const stageBoxes=(index,w)=>{
  const flags=w.workflowChecks||{},dates=w.workflowStageDates||{};
@@ -79,9 +79,27 @@ window.axWOEdit=editor;
 window.axWOCut=(i,j)=>{const w=db.workOrders[i],x=items(w)[j];if(!w||!x)return;const left=pending(x);if(!left)return alert('Cutting complete');
  const q=prompt('Cut Qty (Pending '+left+')',String(left));if(q===null)return;const qty=Number(q);if(!Number.isInteger(qty)||qty<1||qty>left)return alert('Invalid cutting quantity');
  const serials=openSerials(x.cloth,x.width);const srl=prompt('Actual SRL'+(serials.length?' — Active: '+serials.map(a=>a.serial).join(', '):''),x.srl||'');if(srl===null)return;
+ if(!String(srl).trim())return alert('Enter actual SRL for traceability.');
+ const matching=(Array.isArray(db.store)?db.store:[]).filter(row=>
+  String(row.srl||row.serial||row.serialNo||row.srlNo||'').trim().toUpperCase()===String(srl).trim().toUpperCase());
+ let actualCloth=String(x.cloth||''),actualWidth=String(x.width||''),clothSource='Confirmed when Cutting';
+ const roll=matching.length===1?matching[0]:null;
+ if(roll&&String(roll.cloth||roll.material||'').trim()){
+  actualCloth=String(roll.cloth||roll.material).trim();
+  actualWidth=String(roll.width||actualWidth);
+  clothSource='Store SRL master';
+  if(String(x.cloth||'').trim()&&String(x.cloth).trim().toLowerCase()!==actualCloth.toLowerCase()&&!confirm(
+   'Actual SRL '+srl+' has Cloth '+actualCloth+' in Store, but Work Order planned '+x.cloth+'. Use Store Cloth for cutting?'
+  ))return;
+ }else{
+  const entered=prompt('Actual Cloth used from SRL '+srl+' (verify)',actualCloth);
+  if(entered===null)return;
+  if(!String(entered).trim())return alert('Enter actual Cloth for this SRL.');
+  actualCloth=String(entered).trim();
+ }
  const met=prompt('Meter consumed','0');if(met===null)return;const meter=Number(met);if(!Number.isFinite(meter)||meter<0)return alert('Invalid meter');
  if(!Array.isArray(w.items))w.items=items(w);w.items[j].cutQty=num(w.items[j].cutQty)+qty;w.done=w.items.reduce((n,a)=>n+num(a.cutQty),0);w.status=w.items.every(a=>pending(a)===0)?'Cut Complete':'Open';
- db.cutting.push({workNo:w.workNo,description:x.description,size:x.size,cloth:x.cloth,width:x.width,srl,qty,meter,date:new Date().toISOString().slice(0,10)});
+ db.cutting.push({workNo:w.workNo,description:x.description,size:x.size,cloth:actualCloth,width:actualWidth,srl:String(srl).trim(),qty,meter,date:new Date().toISOString().slice(0,10),clothSource});
  save();render();listing();
 };
 function printPending(){const rows=db.workOrders.flatMap(w=>items(w).filter(x=>pending(x)>0).map(x=>'<tr><td>'+E(w.workNo)+'</td><td>'+E(w.party)+'</td><td>'+E(x.description)+'</td><td>'+E(x.size)+'</td><td>'+E(x.cloth)+'</td><td>'+E(x.width)+'</td><td>'+num(x.qty)+'</td><td>'+num(x.cutQty)+'</td><td>'+pending(x)+'</td><td></td></tr>')).join('');if(!rows)return alert('No pending items');const win=window.open('','_blank');if(!win)return alert('Allow popups');win.document.write('<!doctype html><html><head><title>Pending Cutting</title><style>@page{size:A4 landscape;margin:10mm}body{font:12px Arial}table{width:100%;border-collapse:collapse}td,th{border:1px solid #777;padding:7px;text-align:left}</style></head><body><h2>AEROVEX FILTRATION — DAILY PENDING CUTTING</h2><table><tr><th>Work No</th><th>Party</th><th>Product</th><th>Size</th><th>Cloth</th><th>Width</th><th>Order</th><th>Cut</th><th>Pending</th><th>Actual SRL</th></tr>'+rows+'</table></body></html>');win.document.close();win.print()}
