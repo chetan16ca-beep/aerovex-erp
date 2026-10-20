@@ -22,6 +22,12 @@ function ensure(){
   db.hsnTaxMaster.push({hsn:'48120000',rate:18,description:'Filter blocks, slabs and plates of paper pulp (verify pad classification)',source:'CBIC 09/2025-CT(R), Schedule II entry 179',verifiedOn:'2026-10-20'});
   save();
  }
+ if(!db.hsnTaxMaster.some(x=>code(x.hsn)==='5911')){
+  db.hsnTaxMaster.push({hsn:'5911',rate:5,description:'Textile products and articles for technical uses (confirm goods classification)',source:'GST Council 56th Meeting 2025 / Notification 09/2025-CT(R)',verifiedOn:'2026-10-20'});save();
+ }
+ if(!db.hsnTaxMaster.some(x=>code(x.hsn)==='8421')){
+  db.hsnTaxMaster.push({hsn:'8421',rate:18,description:'Filtering and purifying machinery for liquids and gases (classify item)',source:'Notification 09/2025-CT(R), Schedule II, entry 410',verifiedOn:'2026-10-20'});save();
+ }
 }
 ensure();
 window.axHSNLookup=function(value){
@@ -86,7 +92,7 @@ window.axHSNEdit=function(h){
 };
 const oldProductForm=window.productForm;
 window.productForm=function(){
- const rows=(db.products||[]).map((p,i)=>'<tr><td>'+esc(p.code||'')+'</td><td>'+esc(p.name||'')+'</td><td>'+esc(p.hsn||'Not set')+'</td><td>'+esc(window.axHSNLookup(p.hsn)?.rate??'Not mapped')+'%</td><td><button type="button" onclick="axProductEdit('+i+')">Edit</button></td></tr>').join('');
+ const rows=(db.products||[]).map((p,i)=>'<tr><td>'+esc(p.code||'')+'</td><td>'+esc(p.name||'')+'</td><td>'+esc(p.hsn||'Not set')+'</td><td>'+esc(window.axHSNLookup(p.hsn)?.rate??'Not mapped')+(window.axHSNLookup(p.hsn)?'%':'')+'</td><td><button type="button" onclick="axProductEdit('+i+')">Edit</button></td></tr>').join('');
  show('Product Master — HSN Auto GST','<p>Product save karein; HSN Tax Master se GST auto-link hoga. Existing products retained.</p><form id="axProductHSNForm" class="form">'+
  '<label>Product Code<input name="code" value="'+nextProduct()+'" readonly></label><label>Product Name<input name="name" required></label>'+
  '<label>Item Code<input name="item"></label><label>Standard Cloth<input name="cloth"></label>'+
