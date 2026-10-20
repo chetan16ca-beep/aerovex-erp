@@ -85,6 +85,7 @@ function listing(){
 }
  draw();
 }
+window.axWOOverview=listing;
 window.axWOEdit=editor;
 window.axWOCut=(i,j)=>{const w=db.workOrders[i],x=items(w)[j];if(!w||!x)return;const left=pending(x);if(!left)return alert('Cutting complete');
  const q=prompt('Cut Qty (Pending '+left+')',String(left));if(q===null)return;const qty=Number(q);if(!Number.isInteger(qty)||qty<1||qty>left)return alert('Invalid cutting quantity');
