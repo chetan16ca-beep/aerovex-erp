@@ -230,6 +230,21 @@ if(typeof oldPreview==='function')window.axDocPreview=function(type,i){
  }
  return result;
 };
+// Tally-style invoice screens also get a direct entry to Commission & Profit.
+const priorInvoicePrint=window.axPrintInvoice;
+if(typeof priorInvoicePrint==='function')window.axPrintInvoice=function(index){
+ const result=priorInvoicePrint.apply(this,arguments);
+ if(Number.isInteger(index)&&list('invoices')[index]){
+  const area=document.getElementById('modalBody');
+  if(area&&!document.getElementById('axCommissionInvoiceButton')){
+   const b=document.createElement('button');b.id='axCommissionInvoiceButton';
+   b.type='button';b.className='primary';b.textContent='Commission / Expense / Profit';
+   b.onclick=()=>window.axCommissionForInvoice(index);
+   area.appendChild(b);
+  }
+ }
+ return result;
+};
 const css=document.createElement('style');
 css.textContent='.axCommissionPanel{padding:14px;border:1px solid #dce8ee;background:#f9fcff;margin:14px 0;border-radius:12px}.axCommissionPanel h3{margin:0 0 12px}.axCommissionRow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid #dce8ee}.axCommissionRow small{display:block;color:#637787;font-size:12px}.axCommissionRow button{flex-shrink:0}.axCommissionRow span{text-align:right}.axCommissionSummary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.axCommissionSummary>div{border:1px solid #d7e5ea;border-radius:10px;padding:11px;background:#fff;min-width:0}.axCommissionSummary small{display:block;color:#627887;font-size:11px}.axCommissionSummary strong{font-size:16px;display:block;margin-top:4px;overflow-wrap:anywhere}.axCommissionNote{color:#647889;font-size:12px;line-height:1.55}.axCommissionWarning{color:#a12612;font-weight:700}.axCommissionInvoiceHead{background:#edf8fb;border-radius:9px;padding:12px;margin:12px 0}.axCommissionInvoiceHead p{margin:6px 0;font-size:12px}.axCommissionPanel input[type=checkbox]{width:18px!important;height:18px!important;vertical-align:middle}.axCommissionCalc{border:1px solid #c5dfe9;background:#eef8fb;padding:10px;border-radius:10px}.axCommissionCalc p{margin:6px 0}.axCommissionProfit{font-weight:800;font-size:16px;color:#12526b;border-top:1px solid #b7d2d8;padding-top:12px}@media(max-width:650px){.axCommissionSummary{grid-template-columns:1fr 1fr}.axCommissionSummary strong{font-size:13px}}';
 document.head.append(css);
