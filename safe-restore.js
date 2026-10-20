@@ -12,6 +12,7 @@ function normalize(s){return String(s??'').trim().toLowerCase();}
 function id(row,module){
  const fields=identity[module];if(!fields)return null;
  if(module==='invoices')return normalize(row.documentNo||row.invoiceNo)||null;
+ if(module==='purchaseOrders')return normalize(row.id||row.documentNo||row.no)||null;
  const vals=fields.map(k=>normalize(row[k]));return vals.every(Boolean)?vals.join('|'):null;
 }
 function init(){
