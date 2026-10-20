@@ -2,8 +2,8 @@
 (function(){
 'use strict';
 const KEY='aerovex-erp-data-v1';
-const modules=['parties','suppliers','products','quotations','salesOrders','workOrders','store','cutting','departmentWork','packing','challans','invoices','receipts','payments','purchases','expenses','ledger','vouchers','purchaseOrders'];
-const identity={quotations:['quotationNo'],salesOrders:['documentNo'],workOrders:['workNo'],challans:['documentNo'],invoices:['documentNo','invoiceNo'],purchaseOrders:['documentNo'],vouchers:['type','no']};
+const modules=['parties','suppliers','products','quotations','salesOrders','workOrders','store','cutting','departmentWork','packing','challans','invoices','receipts','payments','purchases','expenses','ledger','vouchers','purchaseOrders','purchaseOrderReceipts','dispatchTracking','dispatchEvents','quotationFollowups','auditLog','cfmLinks'];
+const identity={quotations:['quotationNo'],salesOrders:['documentNo'],workOrders:['workNo'],challans:['documentNo'],invoices:['documentNo','invoiceNo'],purchaseOrders:['id'],purchaseOrderReceipts:['id'],dispatchTracking:['id'],dispatchEvents:['id'],quotationFollowups:['id'],auditLog:['date','module','action'],cfmLinks:['erpWorkNo'],vouchers:['type','no']};
 function download(name,data){
  const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
  const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
