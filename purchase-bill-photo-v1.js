@@ -8,7 +8,7 @@ const OCR_URL='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tessera
 let imageUrl='', preparedImage='', sourceFile='', pendingText='', loading=false, ocrLoader=null;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[c]));
 const fmt=v=>(Number(v)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const num=v=>Number(String(v??'').replace(/,/g,''))||0;
+const num=v=>Number(String(v??'').replace(/[₹,\s]/g,'').replace(/^Rs\.?/i,''))||0;
 const tidy=v=>String(v??'').replace(/\s+/g,' ').trim();
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 function dateValue(s){
@@ -61,7 +61,7 @@ function parseBill(text){
  const gstins=[...new Set((joined.toUpperCase().match(/\b\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]\b/g)||[]))];
  const gstin=gstins.find(x=>x!==OWN_GSTIN)||'';
  let invoice='';
- const invRx=/(?:invoice|inv\.?|bill)\s*(?:no\.?|number|#)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9\/-]{1,35})/i;
+ const invRx=/\b(?:invoice|inv\.?|bill)\b\s*(?:no\.?|number|#)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9\/-]{1,35})/i;
  for(const l of lines){
   const m=l.match(invRx);
   if(m&&!/^(?:no|number|date|tax|gst|gstin|invoice|bill)$/i.test(m[1])){invoice=m[1];break}
@@ -175,7 +175,7 @@ function showReview(info){
   '<form id="axOCRPurchaseForm" class="form">'+
   input('Supplier Name','party',info.party,'text','required')+
   input('Supplier Bill No.','supplierInvoice',info.supplierInvoice,'text','required')+
-  input('Bill Date','date',info.date||today(),'date','required')+
+  input('Bill Date','date',info.date||'','date','required')+
   input('Supplier GSTIN','gstin',info.gstin,'text','maxlength="15"')+
   '<label>Tax Type<select name="taxType" required><option value="">Choose GST Type</option>'+
    ['CGST+SGST','IGST','Exempt'].map(x=>'<option value="'+x+'"'+(ttype===x?' selected':'')+'>'+x+'</option>').join('')+'</select></label>'+
