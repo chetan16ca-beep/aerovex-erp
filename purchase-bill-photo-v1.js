@@ -239,7 +239,7 @@ function saveConfirmed(e){
  if(items.some(x=>!x.description||!x.hsn||!(Number(x.qty)>0)||String(x.rate).trim()===''))return alert('Check product description, HSN, quantity and rate for every item.');
  const duplicates=(db.purchases||[]).filter(x=>{
   const id=tidy(x.supplierInvoice||'').replace(/[\s\/-]/g,'').toUpperCase();
-  const sameVendor=gstin?tidy(x.gstin).toUpperCase()===gstin:tidy(x.party).toUpperCase()===vendor.toUpperCase();
+  const sameVendor=(gstin&&tidy(x.gstin).toUpperCase()===gstin)||tidy(x.party).toUpperCase()===vendor.toUpperCase();
   return id&&id===bill.replace(/[\s\/-]/g,'').toUpperCase()&&sameVendor;
  });
  if(duplicates.length)return alert('Duplicate purchase bill: this supplier invoice number is already saved. No new entry created.');
@@ -298,10 +298,40 @@ if(typeof oldDetailed==='function'){
  };
 }
 const oldOpen=window.openModule;
-window.openModule=function(name){if(name==='Purchase Bill Photo')return openUpload();return oldOpen.apply(this,arguments)};
+window.openModule=function(name){if(name==='Purchase Bill Photo')return openUpload();const result=oldOpen.apply(this,arguments);if(name==='Purchase Management'){const root=document.getElementById('modalBody');if(root&&!root.querySelector('#axOCRManagementLaunch')){const button=document.createElement('button');button.id='axOCRManagementLaunch';button.type='button';button.className='primary';button.textContent='📷 Upload Supplier Bill Photo';button.style.margin='9px 0';button.onclick=openUpload;root.insertBefore(button,root.children[1]||null)}}return result};
 if(Array.isArray(modules.accounts)&&!modules.accounts.some(x=>x[0]==='Purchase Bill Photo')){
  const index=modules.accounts.findIndex(x=>x[0]==='Purchase');
  modules.accounts.splice(index<0?modules.accounts.length:index+1,0,['Purchase Bill Photo','📷 Photo → OCR → Purchase Entry']);
 }
 try{render()}catch(e){console.warn('Purchase photo shortcut unavailable',e)}
+
+/* CA purchase CSV: preserve separate HSN and GST details for multi-item bill imports.
+   Existing in-app GST totals still use the saved single parent bill per purchase. */
+const originalGSTExport=window.axGSTDownload;
+if(typeof originalGSTExport==='function'){
+ window.axGSTDownload=function(kind){
+  if(kind!=='purchase')return originalGSTExport.apply(this,arguments);
+  const month=document.getElementById('axGSTMonth')?.value;
+  if(!month)return originalGSTExport.apply(this,arguments);
+  const purchases=(db.purchases||[]).filter(x=>String(x.date||'').slice(0,7)===month);
+  if(!purchases.some(x=>Array.isArray(x.items)&&x.items.length>1))return originalGSTExport.apply(this,arguments);
+  const headings=['Bill Date','Supplier Bill No','ERP Purchase No','Supplier','Supplier GSTIN','Place / State','Item No','HSN','Description','Qty','Unit','Rate','Taxable','CGST','SGST','IGST','GST','Line Total','Bill Total (only first row)','ITC Review'];
+  const rows=[];
+  for(const x of purchases){
+   const lines=Array.isArray(x.items)&&x.items.length?x.items:[{description:x.description,hsn:x.hsn,qty:x.qty,unit:x.unit,rate:x.rate,taxable:x.taxable,gst:x.gst}];
+   lines.forEach((item,i)=>{
+    const taxable=num(item.taxable),tax=num(item.gst),inter=x.taxType==='IGST';
+    const cgst=inter?0:Math.round(tax/2*100)/100,sgst=inter?0:Math.round((tax-cgst)*100)/100;
+    rows.push([x.date||'',x.supplierInvoice||'',x.invoiceNo||'',x.party||'',x.gstin||'',x.place||'',i+1,
+      item.hsn||'',item.description||'',item.qty||'',item.unit||'',item.rate||'',taxable,cgst,sgst,inter?tax:0,tax,Math.round((taxable+tax)*100)/100,
+      i===0?num(x.total):'',x.itcEligible||'Verify with CA']);
+   });
+  }
+  const csv=value=>{let v=String(value??'');if(/^[=+@-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
+  const content=[headings,...rows].map(row=>row.map(csv).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['\uFEFF'+content],{type:'text/csv;charset=utf-8'}));
+  const anchor=document.createElement('a');anchor.href=url;anchor.download='Aerovex-Purchase-HSN-Lines-'+month+'.csv';
+  document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ };
+}
 })();
