@@ -145,11 +145,22 @@ function openUpload(){
   '<p>Upload supplier bill photo. Bill details will fill an editable purchase draft. <b>No record is saved until you confirm.</b></p>'+
   '<label style="display:block;margin:12px 0">Choose bill photo (JPG / PNG)<input id="axOCRFile" type="file" accept="image/*" style="display:block;width:100%;margin-top:8px"></label>'+
   '<label style="display:block;margin:12px 0">Or take a new photo<input id="axOCRCamera" type="file" accept="image/*" capture="environment" style="display:block;width:100%;margin-top:8px"></label>'+
+  '<label style="display:block;margin:12px 0">Import reviewed bill (.json)<input id="axOCRImport" type="file" accept=".json,application/json" style="display:block;width:100%;margin-top:8px"></label>'+
   '<p id="axOCRStatus" role="status">Ready for a clear, full-page bill photo. English printed bills work best.</p>'+
   '<button id="axOCRManual" type="button" hidden>Open manual Purchase draft</button>'+
   '<p><small>Recognition works in the browser using Tesseract; the picture is not uploaded to Aerovex cloud. Check the supplier, invoice number, date, HSN, GST and amounts before saving.</small></p></div>');
  for(const id of ['axOCRFile','axOCRCamera'])document.getElementById(id).addEventListener('change',e=>useFile(e.target.files?.[0]));
  document.getElementById('axOCRManual').addEventListener('click',()=>showReview(parseBill(pendingText)));
+ document.getElementById('axOCRImport').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  if(file.size>200000)return status('Bill draft too large');
+  try{
+   const draft=JSON.parse(await file.text());
+   if(draft.type!=='aerovex-purchase-draft-v1'||!draft.supplierInvoice||!Array.isArray(draft.items)||!draft.items.length||draft.items.length>100)throw Error('Invalid Aerovex purchase draft');
+   sourceFile=file.name||'reviewed-bill.json';pendingText=draft.ocrText||'';
+   showReview(draft);
+  }catch(error){status('Import failed: '+String(error.message||error))}
+ });
 }
 function input(label,name,value,type,more){
  return '<label>'+esc(label)+'<input name="'+name+'" type="'+(type||'text')+'" value="'+esc(value??'')+'" '+(more||'')+'></label>';
@@ -163,6 +174,7 @@ function itemHTML(z){
  '<label>Unit<input data-bill-field="unit" value="'+esc(z.unit||'Nos')+'"></label>'+
  '<label>Rate (before GST)<input data-bill-field="rate" inputmode="decimal" type="number" min="0" step="any" value="'+esc(z.rate??'')+'" required></label>'+
  '<label>Discount %<input data-bill-field="discount" inputmode="decimal" type="number" min="0" max="100" step="any" value="'+esc(z.discount??0)+'"></label>'+
+ '<label>GST % on bill<input data-bill-field="gstRate" type="number" min="0" max="100" step=".01" value="'+esc(z.gstRate??(window.axHSNLookup?.(z.hsn)?.rate??''))+'" placeholder="Verify bill GST %" required></label>'+
  '<button type="button" class="axOCRRemove" style="grid-column:1/-1">Remove item</button></fieldset>';
 }
 function showReview(info){
@@ -170,7 +182,7 @@ function showReview(info){
  const items=info.items?.length?info.items:[{description:'',hsn:'',qty:'',rate:'',unit:'Nos',discount:0}];
  const ttype=info.taxType||'';
  show('Review & Save Purchase Bill',
-  '<p><b>Please verify the photo details.</b> OCR can misread invoice numbers, quantities and tax. Saving requires a valid HSN in Aerovex HSN & GST Tax Master.</p>'+
+  '<p><b>Please verify the photo details.</b> OCR can misread invoice numbers, quantities and tax. The invoice GST % can be entered manually without changing the HSN Tax Master; verify ITC with your CA.</p>'+
   (imageUrl?'<img alt="Original bill photo" src="'+esc(imageUrl)+'" style="max-width:100%;max-height:245px;object-fit:contain;border:1px solid #ddd;border-radius:9px;margin:6px 0">':'')+
   '<form id="axOCRPurchaseForm" class="form">'+
   input('Supplier Name','party',info.party,'text','required')+
@@ -182,6 +194,7 @@ function showReview(info){
   input('Place of Supply / State','place',info.gstin?.slice(0,2)==='24'?'Gujarat':'')+
   '<label>Payment Status<select name="paymentStatus"><option>Pending</option><option>Paid</option><option>Partial</option></select></label>'+
   '<label>Input Tax Credit<select name="itcEligible"><option value="Review">Review with CA</option><option value="Yes">Eligible (verified)</option><option value="No">Not eligible</option></select></label>'+
+  input('Round Off (e.g. -0.30)','roundOff',info.roundOff??0,'number','step=".01"')+
   input('Bill Total printed (for matching)','ocrTotal',info.ocrTotal,'number','min="0" step=".01" placeholder="Optional"')+
   input('Remarks','narration','Imported from bill photo')+
   '<div class="full"><h3>Bill Items</h3><div id="axOCRLines">'+items.map(itemHTML).join('')+'</div>'+
@@ -202,12 +215,39 @@ function showReview(info){
 function readItems(){
  return [...document.querySelectorAll('#axOCRLines .axOCRLine')].map(line=>{
   const read=k=>line.querySelector('[data-bill-field="'+k+'"]')?.value||'';
-  return {description:tidy(read('description')),hsn:read('hsn').replace(/\D/g,''),qty:read('qty'),unit:tidy(read('unit'))||'Nos',rate:read('rate'),discount:read('discount')||0};
+  return {description:tidy(read('description')),hsn:read('hsn').replace(/\D/g,''),qty:read('qty'),unit:tidy(read('unit'))||'Nos',rate:read('rate'),discount:read('discount')||0,gstRate:read('gstRate')};
  });
 }
 function taxFrom(form){
- if(!window.axHSNApplyLines)return {ok:false,error:'HSN & GST module has not loaded. Reload ERP.'};
- return window.axHSNApplyLines(readItems(),form.elements.taxType.value);
+ const raw=readItems(),type=form.elements.taxType.value;
+ if(!['IGST','CGST+SGST','Exempt'].includes(type))return {ok:false,error:'Choose GST Type.'};
+ if(!raw.length)return {ok:false,error:'Add at least one item.'};
+ const round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+ let taxable=0,gst=0;const lines=[],groups={};
+ for(let i=0;i<raw.length;i++){
+  const x=raw[i],q=Number(x.qty),rate=Number(x.rate),discount=Number(x.discount),hsn=x.hsn;
+  if(![4,6,8].includes(hsn.length))return {ok:false,error:'Item '+(i+1)+': valid 4, 6 or 8-digit HSN required.'};
+  if(!x.description||!(q>0)||String(x.rate).trim()===''||!(rate>=0)||!(discount>=0&&discount<=100))return {ok:false,error:'Item '+(i+1)+': check description, qty, rate and discount.'};
+  const mapped=window.axHSNLookup?.(hsn);
+  const gstRate=type==='Exempt'?0:(String(x.gstRate).trim()!==''?Number(x.gstRate):mapped?Number(mapped.rate):NaN);
+  if(!Number.isFinite(gstRate)||gstRate<0||gstRate>100)return {ok:false,error:'Item '+(i+1)+': enter correct supplier-bill GST %.'};
+  const base=round(q*rate*(1-discount/100)),tax=round(base*gstRate/100);
+  lines.push({...x,qty:q,rate,discount,gstRate,taxable:base,gst:tax,gstRateSource:String(x.gstRate).trim()!==''?'Supplier bill':'HSN master'});
+  taxable+=base;gst+=tax;
+  const key=hsn+'|'+gstRate;
+  if(!groups[key])groups[key]={hsn,rate:gstRate,taxable:0,gst:0};
+  groups[key].taxable=round(groups[key].taxable+base);
+  groups[key].gst=round(groups[key].gst+tax);
+ }
+ taxable=round(taxable);gst=round(gst);
+ const off=Number(form.elements.roundOff?.value||0);
+ if(!Number.isFinite(off)||off < -10000||off > 10000)return {ok:false,error:'Invalid round-off.'};
+ const before=round(taxable+gst),total=round(before+off);
+ if(total<0)return {ok:false,error:'Round-off cannot make total negative.'};
+ const rates=[...new Set(lines.map(x=>x.gstRate))];
+ return {ok:true,items:lines,taxable,gst,total,subTotal:before,roundOff:off,
+  gstRate:rates.length===1?rates[0]:'',gstBreakup:Object.values(groups),
+  cgst:type==='IGST'?0:round(gst/2),sgst:type==='IGST'?0:round(gst-round(gst/2)),igst:type==='IGST'?gst:0};
 }
 function updateTotals(){
  const f=document.getElementById('axOCRPurchaseForm'),box=document.getElementById('axOCRTotals');
@@ -220,7 +260,7 @@ function updateTotals(){
  if(!tax.ok){box.textContent='⚠ '+tax.error;return}
  const printed=num(f.elements.ocrTotal.value);
  const difference=printed?Math.abs(tax.total-printed):0;
- box.innerHTML='<b>Taxable: ₹'+fmt(tax.taxable)+' | GST: ₹'+fmt(tax.gst)+' | Total: ₹'+fmt(tax.total)+'</b>'+
+ box.innerHTML='<b>Taxable: ₹'+fmt(tax.taxable)+' | GST: ₹'+fmt(tax.gst)+' | Round Off: ₹'+fmt(tax.roundOff)+' | Final: ₹'+fmt(tax.total)+'</b>'+
  (printed&&difference>1?'<p style="color:#a32923">⚠ Printed bill total ₹'+fmt(printed)+' differs by ₹'+fmt(difference)+'. Check items, freight, discounts, OCR and tax before saving. Clear the printed total only if OCR read it incorrectly.</p>':'');
 }
 function nextPurchaseNumber(){
@@ -245,14 +285,14 @@ function saveConfirmed(e){
  if(duplicates.length)return alert('Duplicate purchase bill: this supplier invoice number is already saved. No new entry created.');
  const tax=taxFrom(f);if(!tax.ok)return alert(tax.error);
  const printed=num(data.ocrTotal);
- if(printed&&Math.abs(tax.total-printed)>1)return alert('Bill total mismatch. Please verify quantities, rates, discounts, GST and additional charges before saving. If OCR read total incorrectly, clear the printed total field.');
+ if(printed&&Math.abs(tax.total-printed)>0.02)return alert('Bill total mismatch. Please verify quantities, rates, discounts, GST and additional charges before saving. If OCR read total incorrectly, clear the printed total field.');
  const no=nextPurchaseNumber(),first=tax.items[0];
  const record={invoiceNo:no,documentNo:no,supplierInvoice:bill,date:data.date,party:vendor,gstin,
   place:tidy(data.place),taxType:data.taxType,items:tax.items,description:tax.items.length===1?first.description:first.description+' + '+(tax.items.length-1)+' more items',
   hsn:tax.items.length===1?first.hsn:'',qty:tax.items.length===1?Number(first.qty):tax.items.reduce((s,x)=>s+Number(x.qty),0),
   unit:tax.items.length===1?first.unit:'Mixed',rate:tax.items.length===1?Number(first.rate):0,
   taxable:tax.taxable,gst:tax.gst,gstRate:tax.gstRate,gstPercent:tax.gstRate,
-  gstBreakup:tax.gstBreakup,cgst:tax.cgst,sgst:tax.sgst,igst:tax.igst,total:tax.total,
+  gstBreakup:tax.gstBreakup,cgst:tax.cgst,sgst:tax.sgst,igst:tax.igst,subTotal:tax.subTotal,roundOff:tax.roundOff,total:tax.total,
   itcEligible:data.itcEligible||'Review',paymentStatus:data.paymentStatus||'Pending',
   narration:tidy(data.narration),remarks:tidy(data.narration),ocrBillTotal:printed||null,
   source:'purchase-bill-photo-ocr',sourceFileName:sourceFile||'',createdAt:new Date().toISOString()};
@@ -271,7 +311,7 @@ function saveConfirmed(e){
  render();
  show('Purchase Entry Saved',
   '<h3>✓ Saved: '+esc(no)+'</h3><p>Supplier: '+esc(vendor)+'<br>Supplier Invoice: '+esc(bill)+
-  '<br>Items: '+tax.items.length+'<br>Taxable: ₹'+fmt(tax.taxable)+'<br>GST: ₹'+fmt(tax.gst)+
+  '<br>Items: '+tax.items.length+'<br>Taxable: ₹'+fmt(tax.taxable)+'<br>GST: ₹'+fmt(tax.gst)+'<br>Round Off: ₹'+fmt(tax.roundOff)+
   '<br><b>Purchase Total: ₹'+fmt(tax.total)+'</b></p>'+
   '<p>Purchase Register and Voucher updated on this device. Other devices need your existing Cloud Sync process.</p>'+
   '<button type="button" id="axOCRRegister">Open Purchase Register</button> <button type="button" id="axOCRNew">Scan another bill</button>');
