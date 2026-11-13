@@ -101,12 +101,14 @@ function showBids(){
  if(!root)return;
  const item=norm($('axCMPItemFilter')?.value);
  const groups=records.filter(x=>!item||norm(x.item)===item);
- let rows=groups.map(x=>({x,c:cost(x)})).sort((a,b)=>a.c.cash-b.c.cash);
+ const rows=groups.map(x=>({x,c:cost(x)})).sort((a,b)=>a.c.cash-b.c.cash);
+ const sameQty=rows.length>1 && rows.every(r=>num(r.x.qty)===num(rows[0].x.qty));
+ const comparable=!!item && sameQty && rows.length>1;
  root.innerHTML='<h3>Saved Supplier Quotes ('+rows.length+')</h3>'+
  '<p class="axCMPNote">Cash outflow includes GST. Post-ITC estimate is only a scenario; claimable ITC must be verified with the CA/GSTR-2B. Freight, packing and other charges are assumed taxable at the item GST rate; edit assumptions to match each invoice. Compare the same product, specification, quantity and delivery basis.</p>'+
  (rows.length?'<div class="axCMPTable"><table><tr><th>Supplier</th><th>Product</th><th>Qty</th><th>Basic incl. extras</th><th>GST</th><th>Cash payable</th><th>Potential net after assumed ITC</th></tr>'+
  rows.map(({x,c})=>'<tr>'+td(x.supplier)+td(x.item)+td(x.qty)+td(rupee(c.taxable))+td(rupee(c.gst))+td(rupee(c.cash))+td(rupee(c.afterAssumedITC))+'</tr>').join('')+'</table></div>'+
- '<p class="axCMPGood">Lowest quoted cash payable: '+esc(rows[0].x.supplier)+' — '+rupee(rows[0].c.cash)+'</p>':'<p>No supplier quotes for this filter.</p>')+
+ (comparable?'<p class="axCMPGood">Lowest quoted cash payable for selected item & identical quantity: '+esc(rows[0].x.supplier)+' — '+rupee(rows[0].c.cash)+'</p>':'<p class="axCMPWarn">No lowest-cost ranking: choose an exact product/specification and enter at least two quotes with identical quantities. Verify delivery, payment and GST terms independently.</p>'):'<p>No supplier quotes for this filter.</p>')+
  '<button type="button" id="axCMPExport">Export comparison JSON backup</button>';
  $('axCMPExport').onclick=()=>{
   const blob=new Blob([JSON.stringify(records,null,2)],{type:'application/json'});
@@ -125,8 +127,9 @@ window.axSupplierRateComparison=function(){
  const form=$('axCMPBidForm');
  form.onsubmit=e=>{
   e.preventDefault();const x=Object.fromEntries(new FormData(form));
-  if(!str(x.supplier)||!str(x.item)||!(num(x.qty)>0)||num(x.rate)<0)return alert('Enter supplier, product, valid quantity and rate.');
-  for(const k of ['discount','gstRate','assumedITC'])if(num(x[k])<0||num(x[k])>100)return alert('Check '+k+' (0–100).');
+  if(!str(x.supplier)||!str(x.item)||!(num(x.qty)>0)||!Number.isFinite(Number(x.rate))||num(x.rate)<0)return alert('Enter supplier, product, valid quantity and rate.');
+  for(const k of ['qty','rate','discount','freight','packing','other','gstRate','assumedITC'])if(x[k]===''||!Number.isFinite(Number(x[k]))||Number(x[k])<0)return alert('Enter a valid nonnegative number for '+k+'.');
+  for(const k of ['discount','gstRate','assumedITC'])if(num(x[k])>100)return alert('Check '+k+' (0–100).');
   const next=load(SKEY);next.push({...x,savedAt:new Date().toISOString(),id:'BID-'+Date.now()});
   if(persist(SKEY,next)){form.reset();showBids()}
  };
