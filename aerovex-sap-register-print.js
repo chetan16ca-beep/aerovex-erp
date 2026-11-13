@@ -18,7 +18,7 @@ const ref=x=>t(x.documentNo||x.invoiceNo||x.quotationNo||x.orderNo||x.challanNo|
 const products=x=>Array.isArray(x.items)&&x.items.length?x.items:[x];
 const desc=(x,key)=>key==='store'?[x.cloth&&'Cloth '+x.cloth,x.width&&'Width '+x.width,x.srl&&'SRL '+x.srl].filter(Boolean).join(' / '):products(x).map(z=>[z.description||z.name||z.product||z.cloth||'',z.moc||'',z.size||''].filter(Boolean).join(' / ')).filter(Boolean).join(' | ');
 const qty=(x,key)=>key==='store'?(x.balance??x.opening??'—')+' m':key==='workOrders'?'Order '+(x.qty??x.orderQty??'—')+' | Done '+(x.done??x.doneQty??'—'):products(x).map(z=>t(z.qty??z.quantity??'—')+' '+t(z.unit||'')).join(' / ');
-const logo=()=>{const x=localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x)?'<img src="'+E(x)+'" alt="Aerovex Filtration" class="axSapRegLogo">':''};
+const logo=()=>{const x=window.axSAPLogoFix?.current?.()||localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x)?'<img src="'+E(x)+'" alt="Aerovex Filtration" class="axSapRegLogo">':''};
 function printRegister(key,ttl,onlyIndex=null){
  const type=k(key);
  if(!VALID.has(type))return false;
@@ -27,16 +27,20 @@ function printRegister(key,ttl,onlyIndex=null){
  const head='<thead><tr><th>NO.</th><th>DOC / SRL NO.</th><th>DATE</th><th>PARTY / REFERENCE</th><th>ITEM / DETAILS</th><th>QTY / STATUS</th>'+(hide?'':'<th>VALUE</th>')+'</tr></thead>';
  const rows=list.map((x,i)=>'<tr><td>'+E(i+1)+'</td><td><b>'+E(ref(x))+'</b></td><td>'+E(x.date||x.createdAt||'—')+'</td><td>'+E(x.party||x.customer||x.supplier||x.person||x.name||'—')+'</td><td>'+E(desc(x,type)||x.remarks||x.remark||x.description||'—')+'</td><td>'+E(qty(x,type))+'</td>'+(hide?'':'<td>'+m(x.total??x.amount??(type==='store'?null:x.value))+'</td>')+'</tr>').join('');
  const count=list.length;
- const doc='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+E(details)+' — Aerovex</title><link rel="stylesheet" href="'+new URL('aerovex-sap-register-print.css?v=1',document.baseURI).href+'"></head><body>'+
- '<main class="axSapRegister"><header class="axSapRegHead"><div class="axSapRegCompany">'+logo()+'<div>'+(logo()?'':'<h1>AEROVEX FILTRATION</h1>')+'<small>Smart Filtration Solutions</small></div></div><div><small>ENTERPRISE PRINT REGISTER</small><h2>'+E(details)+'</h2><span>'+count+' RECORD(S)</span></div></header>'+
- '<div class="axSapRegControls"><div>REGISTER: '+E(details)+'</div><div>PRINTED ON: '+E(new Date().toLocaleDateString('en-IN'))+'</div></div>'+
- '<table class="axSapRegTable">'+head+'<tbody>'+rows+'</tbody></table>'+(count?'':'<p>No records found in the selected register.</p>')+
- '<footer>Smart Filtration Solutions · <b>For AEROVEX FILTRATION</b></footer></main></body></html>';
  const w=window.open('','_blank');if(!w){alert('Allow pop-ups to Print / Save PDF');return true}
- w.document.open();w.document.write(doc);w.document.close();
- const invoke=()=>{w.focus();w.print()};
- if(typeof w.addEventListener==='function')w.addEventListener('load',invoke,{once:true});
- else setTimeout(invoke,400);
+ const write=()=>{
+  if(w.closed)return;
+  const doc='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+E(details)+' — Aerovex</title><link rel="stylesheet" href="'+new URL('aerovex-sap-register-print.css?v=2',document.baseURI).href+'"></head><body>'+
+  '<main class="axSapRegister"><header class="axSapRegHead"><div class="axSapRegCompany">'+logo()+'<div>'+(logo()?'':'<h1>AEROVEX FILTRATION</h1>')+'<small>Smart Filtration Solutions</small></div></div><div><small>ENTERPRISE PRINT REGISTER</small><h2>'+E(details)+'</h2><span>'+count+' RECORD(S)</span></div></header>'+
+  '<div class="axSapRegControls"><div>REGISTER: '+E(details)+'</div><div>PRINTED ON: '+E(new Date().toLocaleDateString('en-IN'))+'</div></div>'+
+  '<table class="axSapRegTable">'+head+'<tbody>'+rows+'</tbody></table>'+(count?'':'<p>No records found in the selected register.</p>')+
+  '<footer>Smart Filtration Solutions · <b>For AEROVEX FILTRATION</b></footer></main></body></html>';
+  if(typeof w.addEventListener==='function')w.addEventListener('load',()=>{w.focus();w.print()},{once:true});
+  w.document.open();w.document.write(doc);w.document.close();
+ };
+ const task=window.axSAPLogoFix?.prepare?.();
+ if(task&&typeof task.then==='function')task.then(write,write);
+ else write();
  return true;
 }
 function printSingle(key,i){
