@@ -161,7 +161,7 @@ async function tick(){
  }finally{busy=false}
 }
 function start(){
- clearInterval(timer);timer=setInterval(tick,INTERVAL);tick();
+ clearInterval(timer);timer=setInterval(tick,INTERVAL);
 }
 async function loadState(){
  if(!session)return;
