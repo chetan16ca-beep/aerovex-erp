@@ -3,9 +3,9 @@
 .axSAPDocument{font:11px/1.5 "Segoe UI",Arial,Helvetica,sans-serif;color:#203a4a;background:#fff;width:100%;max-width:800px;min-width:650px;margin:0 auto;padding:12px;box-sizing:border-box;overflow-wrap:anywhere}
 .axSAPDocument *{box-sizing:border-box}
 .axSAPDocument h1,.axSAPDocument h2,.axSAPDocument h3,.axSAPDocument p{margin:0}
-.axSAPDocument .axSAPDocumentHead{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:122px;border-top:6px solid #12638e;border-bottom:1px solid #a6c4d2;padding:18px 12px 10px;background:#fff;position:static;height:auto;z-index:auto}
+.axSAPDocument .axSAPDocumentHead{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:106px;border-top:6px solid #12638e;border-bottom:1px solid #a6c4d2;padding:12px 12px 9px;background:#fff;position:static;height:auto;z-index:auto}
 .axSAPDocument .axSAPCompany{display:flex;align-items:center;gap:14px;min-width:0}
-.axSAPDocument .axSapLogo{display:block;width:153px;height:94px;max-width:153px;max-height:94px;object-fit:contain;object-position:center;flex-shrink:0}
+.axSAPDocument .axSapLogo{display:block;width:138px;height:84px;max-width:138px;max-height:84px;object-fit:contain;object-position:center;flex-shrink:0;background:transparent;border:0;margin:0}
 .axSAPDocument .axSAPCompany h1{font-size:18px;font-weight:750;color:#13587e;letter-spacing:.03em}
 .axSAPDocument .axSAPCompany small{display:block;color:#5f7890;font-size:10px;margin-bottom:5px}
 .axSAPDocument .axSAPCompany>div div{font-size:9px;line-height:1.5}
@@ -27,7 +27,7 @@
 .axSAPDocument .axSapMissing{color:#916a24;font-size:9px;font-style:italic}
 .axSAPDocument .axSAPBar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#176a93;color:#fff;padding:8px 10px;font-size:10px;margin-top:5px}
 .axSAPDocument .axSAPBar strong{font-weight:750}
-.axSAPDocument .axSAPDocTable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}
+.axSAPDocument .axSAPTableScroll{max-width:100%;overflow:visible}.axSAPDocument .axSAPDocTable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}
 .axSAPDocument .axSAPDocTable th,.axSAPDocument .axSAPDocTable td{padding:8px 5px;vertical-align:top;border-right:1px solid #d8e5ec;border-bottom:1px solid #bcd3df;text-align:left;overflow-wrap:anywhere}
 .axSAPDocument .axSAPDocTable th{background:#e9f3f8;color:#185c7b;font-size:9px;font-weight:700}
 .axSAPDocument .axSAPDocTable td small{display:block;font-size:9px;color:#6b8390;white-space:normal}
@@ -54,11 +54,32 @@
 @media print{
  html,body{margin:0!important;padding:0!important;background:#fff!important}
  .axSAPDocument{padding:0!important;width:100%!important;max-width:none!important;min-width:0!important;font-size:10px!important}
+ .axSAPDocument .axSAPTableScroll{overflow:visible!important;max-width:none!important}
  .axSAPDocument .axSAPDocMeta,.axSAPDocument .axSAPBar,.axSAPDocument .axSAPGrand,.axSAPDocument .axSAPAddress h3,.axSAPDocument .axSAPDocTable th{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }
 @media screen and (max-width:740px){
- .axSAPDocument{width:740px;min-width:740px}
- .axSAPDocViewport{overflow-x:auto}
+ /* Mobile preview reflows to the phone width. A4 PDF still retains the original layout. */
+ .axSAPDocViewport{overflow-x:hidden;max-width:100%;padding:6px}
+ .axSAPDocument{width:100%;min-width:0;max-width:100%;padding:8px;font-size:11px}
+ .axSAPDocument .axSAPDocumentHead{display:block;min-height:0;padding:12px 8px 10px}
+ .axSAPDocument .axSAPCompany{display:flex;align-items:center;gap:10px}
+ .axSAPDocument .axSAPCompany>div{min-width:0;flex:1}
+ .axSAPDocument .axSapLogo{width:120px;height:83px;max-width:120px;max-height:83px}
+ .axSAPDocument .axSAPCompany>div div{font-size:9px;overflow-wrap:anywhere}
+ .axSAPDocument .axSAPDocIdentity{text-align:left;margin-top:12px;padding-top:8px;border-top:1px solid #d7e5ed}
+ .axSAPDocument .axSAPDocIdentity h2{font-size:18px}
+ .axSAPDocument .axSAPDocMeta{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .axSAPDocument .axSAPDocMeta>div:nth-child(2n){border-right:0}
+ .axSAPDocument .axSAPDocMeta>div{min-width:0;border-bottom:1px solid #d3e2ea}
+ .axSAPDocument .axSAPAddressGrid,.axSAPDocument .axSAPAddressGrid.axSAPTriple{grid-template-columns:1fr}
+ .axSAPDocument .axSAPAddress{min-height:0;border-right:0;border-bottom:1px solid #d4e3eb;padding:10px 6px}
+ .axSAPDocument .axSAPTableScroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+ .axSAPDocument .axSAPDocTable{min-width:620px;font-size:10px}
+ .axSAPDocument .axSAPBottom,.axSAPDocument .axSAPNoCommercial{grid-template-columns:1fr}
+ .axSAPDocument .axSAPBottom>div{border-right:0;border-bottom:1px solid #d5e3eb;padding:10px 6px}
+ .axSAPDocument .axSAPEnd{display:block}
+ .axSAPDocument .axSAPVerify{max-width:100%}
+ .axSAPDocument .axSAPSign{margin-top:15px}
 }
 
 /* Sales Order / Delivery Challan: quantity-only SAP delivery schedule, NO RATE OR AMOUNT. */

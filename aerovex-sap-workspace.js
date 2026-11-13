@@ -10,7 +10,7 @@ const s=v=>String(v??'').trim();
 const amount=v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v))?null:Number(v);
 const money=v=>amount(v)===null?'Not recorded':'₹ '+amount(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const get=(x,...keys)=>{for(const k of keys)if(s(x?.[k]))return s(x[k]);return ''};
-const logo=()=>{let data=localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(data)?'<img class="axSapLogo" alt="Aerovex Filtration" src="'+esc(data)+'">':''};
+const logo=()=>{const data=window.axSAPLogoFix?.current?.()||localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(data)?'<img class="axSapLogo" alt="Aerovex Filtration" src="'+esc(data)+'">':''};
 const hasLogo=()=>!!logo();
 const company=()=>db.companySettings&&typeof db.companySettings==='object'?db.companySettings:{};
 function entries(record){return Array.isArray(record.items)&&record.items.length?record.items:[record]}
@@ -71,7 +71,7 @@ function printBody(type,rec,i){
  '<div class="axSAPDocMeta">'+[['DOCUMENT NUMBER',doc],['DOCUMENT DATE',x.date],['PO / RFQ REFERENCE',get(x,'poRef','ref')],['PLACE OF SUPPLY',x.place]].map(p=>'<div><small>'+esc(p[0])+'</small><b>'+esc(p[1]||'—')+'</b></div>').join('')+'</div>'+
  '<div class="axSAPAddressGrid '+(type==='purchaseOrder'?'axSAPTriple':'')+'">'+blocks+'</div>'+
  '<div class="axSAPBar"><strong>10 · MATERIAL & SERVICE OVERVIEW</strong><span>'+entries(x).length+' LINE(S)</span></div>'+
- itemTable(x,hideCommercial)+
+ '<div class="axSAPTableScroll">'+itemTable(x,hideCommercial)+'</div>'+
  (hideCommercial?'<div class="axSAPBottom axSAPNoCommercial"><div><h3>20 · ORDER / DISPATCH TERMS</h3><div class="axSAPTerms">'+conditions+'</div></div><div><h3>30 · DISPATCH REFERENCE</h3><div>Reference: '+esc(get(x,'ref','poRef','sourceSalesOrder')||'—')+'</div><div>Document: '+esc(doc)+'</div><div>Quantities are shown without commercial prices.</div></div></div>':'<div class="axSAPBottom"><div><h3>20 · COMMERCIAL TERMS</h3><div class="axSAPTerms">'+conditions+'</div>'+bank()+'</div><div><h3>30 · PRICING & TAX</h3>'+totals(x)+'</div></div>')+
  '<div class="axSAPEnd"><div class="axSAPVerify">'+(hideCommercial?'Please verify the saved items, quantities and delivery address before issue.':'Values are displayed from the saved ERP document. Verify HSN, GST and addresses before issuing.')+'</div><div class="axSAPSign"><b>For AEROVEX FILTRATION</b><div class="axSAPSignSpace"></div><span>Authorized Signatory</span></div></div></article>';
 }
@@ -83,6 +83,7 @@ function preview(type,index){
  const markup=printBody(type,entry,index);
  const workflows=type==='deliveryChallan'?'<button type="button" id="axSAPFromChallan">Create Bill / Tax Invoice</button>':type==='salesOrder'?'<button type="button" id="axSAPFromSOChallan">Create Delivery Challan</button> <button type="button" id="axSAPFromSOInvoice">Create Tax Invoice</button>':'';
  show(docLabel(type)+' — SAP Preview','<div class="axSAPDocActions"><button type="button" id="axSAPPrintButton" class="primary">Print / Save PDF</button> '+workflows+' <button type="button" id="axSAPBackButton">Close Preview</button></div><div class="axSAPDocViewport">'+markup+'</div>');
+ window.axSAPLogoFix?.apply?.(document.querySelector('.axSAPDocViewport'));
  const invoiceAction=document.getElementById('axSAPFromChallan');
  if(invoiceAction)invoiceAction.onclick=()=>{if(typeof window.axBillFromChallan==='function')window.axBillFromChallan(index)};
  const dcAction=document.getElementById('axSAPFromSOChallan');
@@ -97,12 +98,20 @@ function print(){
  if(!active)return;
  const x=db[group(active.type)]?.[active.index];if(!x)return alert('Saved record not found.');
  const w=window.open('','_blank');if(!w)return alert('Please allow popups for Print / Save PDF.');
- const uri=new URL('aerovex-sap-documents.css?v=1',document.baseURI).href;
+ const uri=new URL('aerovex-sap-documents.css?v=2',document.baseURI).href;
  const no=identifier(x,active.type,active.index);
- w.addEventListener('load',()=>{w.focus();w.print()},{once:true});
- w.document.open();
- w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(no)+'</title><link rel="stylesheet" href="'+esc(uri)+'"></head><body>'+printBody(active.type,x,active.index)+'</body></html>');
- w.document.close();
+ // Open synchronously from the user click; wait only for logo conversion,
+ // so the saved original logo is never overwritten and popup blockers stay off.
+ const write=()=>{
+  if(w.closed)return;
+  w.addEventListener('load',()=>{w.focus();w.print()},{once:true});
+  w.document.open();
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(no)+'</title><link rel="stylesheet" href="'+esc(uri)+'"></head><body>'+printBody(active.type,x,active.index)+'</body></html>');
+  w.document.close();
+ };
+ const task=window.axSAPLogoFix?.prepare?.();
+ if(task&&typeof task.then==='function')task.then(write,write);
+ else write();
 }
 function appendAddressFields(form,mode){
  if(!form||form.dataset.axSapAddressReady==='1')return;
