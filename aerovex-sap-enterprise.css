@@ -1,0 +1,62 @@
+/* Aerovex SAP-inspired enterprise workspace. Visual layer only.
+   Does not alter ERP accounting, documents, stock, authentication, or cloud sync. */
+:root{--ax-brand:#086fa5!important;--ax-brand-dark:#124a6e!important;--ax-brand-light:#eaf4f9!important;--ax-brand-rgb:8,111,165!important;--ax-radius:5px!important;--ax-ink:#243b4a!important}
+html{scroll-behavior:smooth}
+body{font-family:"Segoe UI",Inter,Arial,system-ui,sans-serif!important;background:#edf2f6!important;color:#263c4b!important;font-size:13px;line-height:1.48}
+body>header{height:70px!important;min-height:70px!important;box-shadow:0 2px 9px #2c4e6414!important;background:#fff!important;border-bottom:3px solid #1677aa!important;padding:9px clamp(12px,2.2vw,32px)!important}
+body>header .brand{min-width:0;gap:12px!important}
+body>header .brand .mark{border-radius:4px!important;width:54px!important;height:50px!important;background:#edf6fa!important;box-shadow:none!important}
+body>header .brand b{font-size:17px!important;font-weight:700!important;color:#174766!important;letter-spacing:.035em!important}
+body>header .brand small{font-size:11px!important;color:#668095!important}
+body>header #menu{border:1px solid #bcd2de!important;background:#eff6fa!important;color:#155f85!important;border-radius:4px!important}
+body>nav{background:#f7fafc;border-bottom:1px solid #cedde6}
+body>nav button,body>nav a{border-radius:4px!important}
+main{max-width:1530px!important;padding:17px 20px 45px!important}
+.hero{min-height:127px!important;gap:13px!important;padding:18px 25px!important;background:linear-gradient(110deg,#164d70 0%,#0d6489 75%,#277ca1 100%)!important;border:1px solid #0b5b7f!important;border-radius:6px!important;box-shadow:0 4px 13px #17496819!important}
+.hero:after{display:none!important}
+.hero h1{font-size:26px!important;font-weight:730!important;letter-spacing:.005em!important}
+.hero p{font-size:12px!important;color:#e2f1f8!important}
+.hero .status{border-radius:3px!important;background:#ffffff13!important;font-weight:600!important}
+.axHeroActions{margin-top:12px!important}
+.axHeroActions button{border-radius:4px!important;padding:9px 11px!important;font-size:12px!important}
+.kpis{gap:11px!important;margin:13px 0!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.kpi{border:1px solid #d0dfe8!important;border-left:4px solid #2687b5!important;border-radius:4px!important;padding:14px 16px!important;min-height:93px!important;background:#fff!important;box-shadow:0 2px 6px #183f5609!important}
+.kpi:before{display:none!important}.kpi:hover{transform:none!important}
+.kpi small{font-size:11px!important;color:#567183!important;font-weight:650!important;text-transform:uppercase;letter-spacing:.05em!important}
+.kpi strong{font-size:25px!important;color:#164e70!important;margin-top:4px!important}
+.panel,.axWOCard,.axWOLine{border:1px solid #cedfe8!important;border-radius:5px!important;box-shadow:0 2px 7px #2548620b!important;background:#fff!important}
+.panel{padding:16px 17px!important;margin:13px 0!important}
+.panelHead{border-bottom:1px solid #dbe7ee;padding-bottom:9px;margin-bottom:12px}
+.panelHead h2{color:#134d70!important;font-size:16px!important;font-weight:700!important;margin:0!important}
+.panelHead span{font-size:10px!important;letter-spacing:.04em;color:#668299!important}
+.tile,.quick button,#axThemeOpen,.axCFMNav button,.axReportOptions button{border:1px solid #c7dce8!important;border-left:3px solid #2382ac!important;border-radius:4px!important;background:#fff!important;box-shadow:none!important;color:#23546f!important;min-height:60px!important;padding:12px!important;transition:background .15s,border-color .15s!important}
+.tile:hover,.quick button:hover,.axCFMNav button:hover{transform:none!important;background:#eff7fb!important;border-color:#3c9ec7!important;box-shadow:none!important}
+.tile b{color:#205675!important;font-size:12px;font-weight:700}.tile small{font-size:10px;color:#748b99}
+.quick,.tiles{gap:8px!important;grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important}
+.flow{gap:6px!important}.flow span{background:#eaf5fa!important;color:#225b78;border:1px solid #d0e3ed;border-radius:3px!important;font-size:10px!important;font-weight:650}
+.sheet{width:min(1100px,calc(100vw - 16px))!important;max-height:96vh!important;padding:22px!important;border-radius:6px!important;box-shadow:0 16px 45px #071d3562!important;border:1px solid #c3d9e5!important;background:#fff!important}
+#modalBody>h2:first-child{position:relative;color:#174f71!important;background:#eaf3f8;font-size:19px!important;font-weight:700!important;border-left:4px solid #197fae!important;border-bottom:1px solid #cfe0e9;margin:-4px 30px 17px -4px;padding:11px 14px;border-radius:2px}
+.close{border-radius:3px!important;border:1px solid #bcd2e0!important;color:#1c638a;background:#eff7fa!important}
+.form{gap:11px 14px!important}.form label{font-weight:600!important;color:#426074!important;font-size:11px!important;letter-spacing:.008em}
+.form input,.form select,.form textarea,.axWOGrid input,.axWOGrid select,#modal input,#modal select,#modal textarea{font-family:inherit;border:1px solid #b5cad9!important;border-radius:3px!important;background:#fff!important;min-height:38px;padding:9px 10px!important;color:#283e4d;box-shadow:inset 0 1px 2px #00000006}
+#modal textarea{min-height:70px;line-height:1.5}
+.form input:focus,.form select:focus,.form textarea:focus{outline:2px solid #84c8e9!important;outline-offset:0!important;border-color:#278ab7!important}
+.form fieldset,.axWOCard{border-radius:3px!important;border-color:#c9dbe5!important}
+.primary,button.primary{border:1px solid #166f9a!important;background:#0e78a7!important;color:white!important;border-radius:4px!important;padding:10px 15px!important;box-shadow:none!important;font-weight:650!important}
+.primary:hover{background:#0a638d!important}
+button:not(.primary){font-family:inherit}
+.reportWrap,.axReportOptions{border:1px solid #d0dfe8;border-radius:3px;background:white}
+.report,table:not(.axTSPaper table):not(.axSAPDocTable){border-collapse:collapse}
+.report th,.report td{padding:8px 10px;border:1px solid #d2e2eb!important}
+.report th{background:#e9f3f8!important;color:#205775!important;font-weight:700!important;font-size:10px;letter-spacing:.03em}
+.report td{font-size:11px;color:#374f5c}
+.summaryCards>div{border-radius:3px!important;background:#f7fbfd!important}
+#axThemePanel .panelHead{margin:0 0 12px!important}
+.axSAPAddressTitle{grid-column:1/-1;margin:9px 0 0;padding:9px 11px;background:#e9f3f8;color:#145c80;font-size:12px;font-weight:750;border-left:4px solid #1e7fa8}
+.axSAPAddressHint{grid-column:1/-1;color:#607a8b;font-size:11px;padding:3px}
+.axSAPAddressFields{display:contents}
+.axSAPDocActions{display:flex;gap:9px;margin:10px 0;flex-wrap:wrap}
+.axSAPDocViewport{width:100%;overflow:auto;background:#f5f7f9;padding:10px;border:1px solid #d5e3eb;border-radius:3px}
+@media(max-width:850px){main{padding:11px!important}.hero{padding:16px!important;min-height:0!important}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.kpi{min-height:86px!important}.kpi strong{font-size:21px!important}.panel{padding:12px!important}.quick,.tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sheet{padding:13px!important}}
+@media(max-width:500px){body>header .brand b{font-size:13px!important}.hero h1{font-size:23px!important}.quick,.tiles{gap:7px!important}.tile,.quick button{font-size:11px!important;padding:9px!important}.panelHead h2{font-size:14px!important}.sheet{padding:11px!important}#modalBody>h2:first-child{font-size:16px!important}}
+@media print{body{background:#fff!important}body>header,body>nav,main,.axHeroActions{display:none!important}.axSAPDocViewport{padding:0;border:0;background:white;overflow:visible}}
