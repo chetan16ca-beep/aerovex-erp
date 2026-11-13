@@ -60,7 +60,10 @@ function compare(q,o){
  return {issues,rows};
 }
 function selected(k,selector){const i=Number($(selector)?.value);return Number.isInteger(i)?list(k)[i]:null}
-function reviewKey(q,o){return [id(q,'Q',0),id(o,'SO',0),str(q.date),str(o.date),str(q.total),str(o.total)].join('|')}
+function reviewKey(q,o){
+ const pick=x=>({number:x.quotationNo||x.orderNo||x.documentNo||'',date:x.date||'',party:x.party||'',gstin:x.gstin||'',taxType:x.taxType||'',taxable:x.taxable,gst:x.gst,total:x.total,items:lines(x).map(z=>({description:z.description,hsn:z.hsn,size:z.size,unit:z.unit,qty:z.qty,rate:z.rate,discount:z.discount,gstRate:z.gstRate}))});
+ return JSON.stringify([pick(q),pick(o)]);
+}
 function renderPO(){
  const q=selected('quotations','axCMPQuote'),o=selected('salesOrders','axCMPOrder'),out=$('axCMPPOResult');
  if(!out)return;
