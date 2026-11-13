@@ -73,7 +73,7 @@ function printBody(type,rec,i){
  '<div class="axSAPBar"><strong>10 · MATERIAL & SERVICE OVERVIEW</strong><span>'+entries(x).length+' LINE(S)</span></div>'+
  itemTable(x,hideCommercial)+
  (hideCommercial?'<div class="axSAPBottom axSAPNoCommercial"><div><h3>20 · ORDER / DISPATCH TERMS</h3><div class="axSAPTerms">'+conditions+'</div></div><div><h3>30 · DISPATCH REFERENCE</h3><div>Reference: '+esc(get(x,'ref','poRef','sourceSalesOrder')||'—')+'</div><div>Document: '+esc(doc)+'</div><div>Quantities are shown without commercial prices.</div></div></div>':'<div class="axSAPBottom"><div><h3>20 · COMMERCIAL TERMS</h3><div class="axSAPTerms">'+conditions+'</div>'+bank()+'</div><div><h3>30 · PRICING & TAX</h3>'+totals(x)+'</div></div>')+
- '<div class="axSAPEnd"><div class="axSAPVerify">Values are displayed from the saved ERP document. Verify HSN, GST and addresses before issuing.</div><div class="axSAPSign"><b>For AEROVEX FILTRATION</b><div class="axSAPSignSpace"></div><span>Authorized Signatory</span></div></div></article>';
+ '<div class="axSAPEnd"><div class="axSAPVerify">'+(hideCommercial?'Please verify the saved items, quantities and delivery address before issue.':'Values are displayed from the saved ERP document. Verify HSN, GST and addresses before issuing.')+'</div><div class="axSAPSign"><b>For AEROVEX FILTRATION</b><div class="axSAPSignSpace"></div><span>Authorized Signatory</span></div></div></article>';
 }
 let active=null;
 function preview(type,index){
@@ -158,6 +158,7 @@ if(typeof oldEdit==='function')window.axEditSavedDocument=function(key,i){const 
 window.axQuotationPreview=function(i){return preview('quotation',i)};
 const oldDocPreview=window.axDocPreview;
 window.axDocPreview=function(t,i){
+ if(t==='Quotation')return preview('quotation',i);
  if(t==='Purchase Order')return preview('purchaseOrder',i);
  if(t==='Sales Invoice')return preview('invoice',i);
  if(t==='Sales Order / PO')return preview('salesOrder',i);
