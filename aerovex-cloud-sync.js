@@ -94,6 +94,62 @@ function localOnly(oldData,newData){
  }
  return missing;
 }
+
+/* Conservative three-way merge for concurrent use of Mobile and PC.
+   Unchanged records retain their exact values. Concurrent edits to the same
+   existing record never merge silently. New records must have unique IDs.
+   Changes to distinct top-level modules can merge without conflict. */
+function mergeData(before,ours,theirs){
+  const result={},keys=new Set([...Object.keys(before),...Object.keys(ours),...Object.keys(theirs)]);
+  for(const k of keys){
+    const original=before[k],mine=ours[k],cloudVal=theirs[k];
+    const mineChanged=stable(mine)!==stable(original);
+    const cloudChanged=stable(cloudVal)!==stable(original);
+    let value;
+    if(!mineChanged)value=cloudVal;
+    else if(!cloudChanged)value=mine;
+    else if(stable(mine)===stable(cloudVal))value=mine;
+    else if(Array.isArray(original)&&Array.isArray(mine)&&Array.isArray(cloudVal)){
+      // Safe auto merge of append-only records only. Modified/deleted historic
+      // records need human review; merging them risks incorrect GST/stock.
+      const length=original.length;
+      const prefixOkay=a=>a.length>=length&&original.every((v,i)=>stable(v)===stable(a[i]));
+      if(!prefixOkay(mine)||!prefixOkay(cloudVal))throw Error(k+': both devices changed existing entries');
+      const addedMine=mine.slice(length),addedCloud=cloudVal.slice(length);
+      const ids=new Set(original.map(x=>id(k,x)));
+      for(const x of [...addedCloud,...addedMine]){
+        const identity=id(k,x);
+        if(ids.has(identity))throw Error(k+': duplicate document/entry ID on both devices');
+        ids.add(identity);
+      }
+      value=original.concat(addedCloud,addedMine);
+    }
+    else throw Error(k+': both devices edited the same setting or record');
+    if(value!==undefined)result[k]=value;
+  }
+  return result;
+}
+async function mergeConcurrent(cloudRow,ourSnapshot){
+  if(modalIsOpen())return status('Both devices have updates. Save and close the open form before safe merge.');
+  let combined;
+  try{combined=mergeData(JSON.parse(baseline),JSON.parse(ourSnapshot),cloudRow.payload)}
+  catch(e){return stop('Conflict needs review — '+e.message+'.')}
+  // Don't accidentally remove any locally saved record.
+  const missing=localOnly(JSON.parse(ourSnapshot),combined);
+  if(missing.length)return stop('Safety check: merged data misses '+missing.length+' local entries.');
+  const newData=stable(combined);
+  if(newData!==stable(cloudRow.payload)){
+    const at=new Date().toISOString();
+    const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(cloudRow.updated_at)+'&select=updated_at';
+    const updated=await send(where,'PATCH',{payload:combined,updated_at:at},{Prefer:'return=representation'});
+    if(!Array.isArray(updated)||updated.length!==1)return status('Cloud changed during merge. Retrying safely on next sync.');
+    setCurrent(combined);baseline=stable(local());stamp=updated[0].updated_at;
+  }else{
+    setCurrent(cloudRow.payload);baseline=stable(local());stamp=cloudRow.updated_at;
+  }
+  status('✓ Both devices updated — different entries merged safely at '+date());
+}
+
 async function initial(){
   if(!session)return status('Sign in first.');
   if(!confirm('MOBILE ONLY: Set this mobile as the starting Aerovex cloud data? This will not delete any existing cloud data. First download a backup.'))return;
@@ -141,10 +197,11 @@ async function tick(){
   const c=await cloud();
   if(!c)return stop('Cloud source missing.');
   const here=stable(local()),localChanged=here!==baseline,remoteChanged=c.updated_at!==stamp;
-  if(localChanged&&remoteChanged)return stop('Conflict: both mobile and PC changed. No overwrite.');
+  if(localChanged&&remoteChanged)return await mergeConcurrent(c,here);
   if(remoteChanged){
    if(modalIsOpen())return status('New cloud data waiting. Close the form to refresh safely.');
-   if(localChanged)return stop('Conflict: changes on both devices.');
+   const missing=localOnly(JSON.parse(here),c.payload);
+   if(missing.length)return stop('Cloud update lacks '+missing.length+' local entries — review needed.');
    setCurrent(c.payload);baseline=stable(local());stamp=c.updated_at;status('✓ Downloaded latest Aerovex update at '+date());return;
   }
   if(localChanged){
@@ -183,7 +240,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set on your mobile and PC. Changes appear automatically about every 8 seconds while the ERP is open and online.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Mobile: Initialize Shared Data</button><p><button type="button" id="ax2Join">2B. PC: Join Existing Shared Data</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Concurrent edits pause sync; no silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set on your mobile and PC. Changes appear automatically about every 8 seconds while the ERP is open and online.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Mobile: Initialize Shared Data</button><p><button type="button" id="ax2Join">2B. PC: Join Existing Shared Data</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
