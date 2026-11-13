@@ -10,7 +10,7 @@ masters:[['Party Master','Customers'],['Supplier Master','Vendors'],['Product Ma
 const kpis=[['Open Orders',()=>db.workOrders.filter(x=>x.status!=='Closed').length],['Pending Production',()=>db.workOrders.reduce((a,x)=>a+Math.max(0,+x.qty-(+x.done||0)),0)],['Receivable',()=>money(db.invoices.reduce((a,x)=>a+(+x.total||0),0)-db.receipts.reduce((a,x)=>a+(+x.amount||0),0))],['Stock SRL',()=>db.store.filter(x=>(+x.balance||0)>0).length]];
 function money(n){return '₹'+Number(n||0).toLocaleString('en-IN')}
 function render(){document.querySelector('#kpis').innerHTML=kpis.map(x=>'<div class="kpi"><small>'+x[0]+'</small><strong>'+x[1]()+'</strong></div>').join('');
-document.querySelector('#quick').innerHTML=['New Quotation','New Work Order','Store / SRL Entry','Production Entry'].map(x=>'<button onclick="openModule(\''+x+'\')">＋ '+x+'</button>').join('');
+document.querySelector('#quick').innerHTML=['New Quotation','New Sales Order','New Work Order','Store / SRL Entry','Production Entry'].map(x=>'<button onclick="openModule(\''+x+'\')">＋ '+x+'</button>').join('');
 for(const g of ['production','accounts','masters'])document.querySelector('#'+g).innerHTML=modules[g].map(x=>'<div class="tile" onclick="openModule(\''+x[0]+'\')"><b>'+x[0]+'</b><small>'+x[1]+'</small></div>').join('')}
 function closeModal(){document.querySelector('#modal').classList.add('hidden')}
 function show(title,body){document.querySelector('#modalBody').innerHTML='<h2>'+title+'</h2>'+body;document.querySelector('#modal').classList.remove('hidden')}
