@@ -109,20 +109,21 @@ function mergeData(before,ours,theirs){
     if(!mineChanged)value=cloudVal;
     else if(!cloudChanged)value=mine;
     else if(stable(mine)===stable(cloudVal))value=mine;
-    else if(Array.isArray(original)&&Array.isArray(mine)&&Array.isArray(cloudVal)){
+    else if((original===undefined||Array.isArray(original))&&Array.isArray(mine)&&Array.isArray(cloudVal)){
       // Safe auto merge of append-only records only. Modified/deleted historic
       // records need human review; merging them risks incorrect GST/stock.
-      const length=original.length;
-      const prefixOkay=a=>a.length>=length&&original.every((v,i)=>stable(v)===stable(a[i]));
+      const originalEntries=Array.isArray(original)?original:[];
+      const length=originalEntries.length;
+      const prefixOkay=a=>a.length>=length&&originalEntries.every((v,i)=>stable(v)===stable(a[i]));
       if(!prefixOkay(mine)||!prefixOkay(cloudVal))throw Error(k+': both devices changed existing entries');
       const addedMine=mine.slice(length),addedCloud=cloudVal.slice(length);
-      const ids=new Set(original.map(x=>id(k,x)));
+      const ids=new Set(originalEntries.map(x=>id(k,x)));
       for(const x of [...addedCloud,...addedMine]){
         const identity=id(k,x);
         if(ids.has(identity))throw Error(k+': duplicate document/entry ID on both devices');
         ids.add(identity);
       }
-      value=original.concat(addedCloud,addedMine);
+      value=originalEntries.concat(addedCloud,addedMine);
     }
     else throw Error(k+': both devices edited the same setting or record');
     if(value!==undefined)result[k]=value;
