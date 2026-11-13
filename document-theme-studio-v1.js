@@ -22,7 +22,7 @@ const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const S=v=>String(v??'').trim();
 const N=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
 const M=v=>v===undefined||v===null||v===''||N(v)===null?'Not recorded':'₹ '+N(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const current=()=>{try{const x=JSON.parse(localStorage.getItem(K)||'{}');return {quote:names[x.quote]?x.quote:'corporate',invoice:names[x.invoice]?x.invoice:'gst'}}catch(e){return {quote:'corporate',invoice:'gst'}}};
+const current=()=>{try{const x=JSON.parse(localStorage.getItem(K)||'{}');return {quote:names[x.quote]?x.quote:'mnc',invoice:names[x.invoice]?x.invoice:'gst'}}catch(e){return {quote:'mnc',invoice:'gst'}}};
 const root=()=>document.getElementById('axTSApp');
 const kind=()=>document.getElementById('axTSKind')?.value==='invoice'?'invoice':'quote';
 const records=k=>Array.isArray(db[k==='invoice'?'invoices':'quotations'])?db[k==='invoice'?'invoices':'quotations']:[];
@@ -135,7 +135,7 @@ function doc(x,k,t){
   case 'compact':
    layout='<div class="axHeader">'+brand+docid+'</div>'+info+itemTable+'<div class="axTwo"><div>'+terms+bankBlock+'</div>'+total+'</div>'+sign+foot;break;
   case 'ledger':
-   layout='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px">'+brand+'<div style="text-align:right">'+companyHeader(x)+'</div></div><div class="axLedgerTitle"><h2>'+head+'</h2><b>'+E(no)+'</b> • '+E(x.date||'—')+'</div>'+info+itemTable+total+'<div class="axTwo">'+terms+bankBlock+'</div>'+sign+foot;break;
+   layout='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px">'+brand+'<div style="text-align:right"><div class="axLabel">Issue Date</div>'+E(x.date||'—')+'</div></div><div class="axLedgerTitle"><h2>'+head+'</h2><b>'+E(no)+'</b> • '+E(x.date||'—')+'</div>'+info+itemTable+total+'<div class="axTwo">'+terms+bankBlock+'</div>'+sign+foot;break;
   case 'editorial':
    layout='<div class="axEditorialHero"><div class="axEditorialSide">'+(isQ?'QTN':'INV')+'</div><div class="axEditorialMain"><div class="axKicker">AEROVEX DOCUMENT STUDIO</div>'+brand+'<div style="margin-top:10px"><h2>'+head+'</h2><b>'+E(no)+'</b> · '+E(x.date||'—')+'</div></div></div>'+info+itemTable+'<div class="axEditorialBottom">'+total+'<div>'+terms+bankBlock+'</div></div>'+sign+foot;break;
   case 'blueprint':
@@ -175,7 +175,7 @@ function printDoc(){
  w.document.close();w.focus();setTimeout(()=>w.print(),350);
 }
 window.axDocumentThemeStudio=function(){
- show('Aerovex Document Theme Studio','<div id="axTSApp"><p>Choose a theme for a saved Aerovex quotation or tax invoice. Preview/Print only; no existing amounts, GST, or bill numbers are edited.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Document type<select id="axTSKind"><option value="quote">Quotation</option><option value="invoice">Tax Invoice</option></select></label><label>Saved document<select id="axTSDoc"></select></label><label>Print theme<select id="axTSTheme">'+Object.entries(names).map(([v,n])=>'<option value="'+v+'">'+E(n)+'</option>').join('')+'</select></label></div><p><button id="axTSSaveTheme" type="button">Save Theme Preference</button> <button id="axTSPrint" class="primary" type="button">Print / Save PDF</button></p><p id="axTSNotice" role="status"></p><div id="axTSPreview"></div></div>');
+ show('Aerovex Document Theme Studio','<div id="axTSApp"><p>10 distinct A4 designs (not just colors). Suggested: Global MNC for Quotation and GST Precision for Bill. Preview/Print only; saved document values are never changed.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Document type<select id="axTSKind"><option value="quote">Quotation</option><option value="invoice">Tax Invoice</option></select></label><label>Saved document<select id="axTSDoc"></select></label><label>Print theme<select id="axTSTheme">'+Object.entries(names).map(([v,n])=>'<option value="'+v+'">'+E(n)+'</option>').join('')+'</select></label></div><p><button id="axTSSaveTheme" type="button">Save Theme Preference</button> <button id="axTSPrint" class="primary" type="button">Print / Save PDF</button></p><p id="axTSNotice" role="status"></p><div id="axTSPreview"></div></div>');
  document.getElementById('axTSKind').onchange=redraw;
  document.getElementById('axTSDoc').onchange=renderPreview;
  document.getElementById('axTSTheme').onchange=renderPreview;
