@@ -64,7 +64,7 @@ function printBody(type,rec,i){
   blocks=addressBox('BILL TO / SOLD-TO PARTY',partnerName,billAddress,get(x,'billToGstin','gstin'),get(x,'billToContact','attention'))+
    addressBox('SHIP TO / DELIVERY',shipName,shipAddress,get(x,'shipToGstin'),get(x,'shipToContact','attention'));
  }
- let conditions=[['Payment Terms',x.payment],['Delivery Terms',x.delivery],...(hideCommercial?[]:[['Freight',x.freight],['Packing',x.packing]]),['Warranty',x.warranty],['Remarks',x.remarks]].filter(z=>s(z[1])).map(z=>'<div class="axSAPTerm"><b>'+esc(z[0])+':</b> '+esc(z[1])+'</div>').join('');
+ let conditions=(hideCommercial?[['Delivery Terms',x.delivery],['Dispatch Instructions',x.shippingInstructions||x.dispatchInstructions]]:[['Payment Terms',x.payment],['Delivery Terms',x.delivery],['Freight',x.freight],['Packing',x.packing],['Warranty',x.warranty],['Remarks',x.remarks]]).filter(z=>s(z[1])).map(z=>'<div class="axSAPTerm"><b>'+esc(z[0])+':</b> '+esc(z[1])+'</div>').join('');
  if(!conditions)conditions='<span class="axSapMissing">Commercial terms not recorded</span>';
  return '<article class="axSAPDocument" data-ax-sap-type="'+esc(type)+'"><header class="axSAPDocumentHead">'+seller+
  '<div class="axSAPDocIdentity"><small>ENTERPRISE COMMERCIAL DOCUMENT</small><h2>'+esc(docLabel(type))+'</h2><strong>'+esc(doc)+'</strong></div></header>'+
