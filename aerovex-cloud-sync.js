@@ -95,6 +95,70 @@ function localOnly(oldData,newData){
  return missing;
 }
 
+
+/* Owner-initiated recovery for an older cloud snapshot.
+   Never runs automatically. Archives BOTH copies locally before conditional
+   update and refuses if the cloud has any records missing on this mobile.
+   The source/mobile copy remains unchanged. */
+function archiveCloud(row){
+  const when=new Date().toISOString().replace(/[:.]/g,'-');
+  const documentBackup=JSON.stringify({application:'Aerovex ERP',kind:'PreviousCloudSnapshot',updated_at:row.updated_at,payload:row.payload},null,2);
+  localStorage.setItem('aerovex-previous-cloud-'+when,documentBackup);
+  const url=URL.createObjectURL(new Blob([documentBackup],{type:'application/json'}));
+  const a=document.createElement('a');
+  a.href=url;a.download='Aerovex-CLOUD-PRE-RECOVERY-'+when+'.json';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function conflictsById(cloudData,sourceData){
+  const changed=[];
+  for(const [k,arr]of Object.entries(cloudData)){
+    if(!Array.isArray(arr))continue;
+    const ours=Array.isArray(sourceData[k])?sourceData[k]:[];
+    const ix=new Map(ours.map(x=>[id(k,x),x]));
+    for(const x of arr)if(ix.has(id(k,x))&&stable(ix.get(id(k,x)))!==stable(x))
+      changed.push(k+': '+String(x.documentNo||x.quotationNo||x.workNo||x.invoiceNo||x.name||x.party||id(k,x)).slice(0,90));
+  }
+  return changed;
+}
+function duplicatedIds(data){
+  const duplicate=[];
+  for(const [k,arr]of Object.entries(data)){
+    if(!Array.isArray(arr))continue;
+    const ids=new Set();
+    for(const x of arr){const key=id(k,x);if(ids.has(key))duplicate.push(k+': '+key.slice(0,60));ids.add(key)}
+  }
+  return duplicate;
+}
+async function repairOldCloud(){
+  if(!session)return status('Sign in first.');
+  if(busy)return status('A sync request is running. Try again in a few seconds.');
+  busy=true;
+  try{
+    const prior=await cloud();
+    if(!prior)return status('No existing cloud snapshot. Use Mobile Initialize instead.');
+    const source=local();
+    const remoteOnly=localOnly(prior.payload,source);
+    if(remoteOnly.length)return status('⛔ Recovery blocked: cloud has '+remoteOnly.length+' entries missing on mobile. Examples: '+remoteOnly.slice(0,3).join('; ')+'. Save both backups and reconcile.');
+    const unmapped=Object.keys(prior.payload).filter(k=>!Object.prototype.hasOwnProperty.call(source,k)&&!Array.isArray(prior.payload[k]));
+    if(unmapped.length)return status('⛔ Recovery blocked: mobile lacks cloud settings '+unmapped.slice(0,5).join(', ')+'. Review before continuing.');
+    const duplicates=duplicatedIds(source);
+    if(duplicates.length)return status('⛔ Recovery blocked: mobile has duplicate identifiers: '+duplicates.slice(0,3).join('; '));
+    if(stable(prior.payload)===stable(source))return status('Both copies already match. Choose Resume / Verify Auto Sync.');
+    const changed=conflictsById(prior.payload,source);
+    const details='Older cloud dated '+prior.updated_at+'. '+changed.length+' overlapping entries have different content. Mobile values will be used for these. Cloud records missing on mobile: 0.';
+    if(!confirm('MOBILE ONLY — do NOT do this from PC.\n'+details+'\nDownload mobile and old cloud safety backups before proposing an update?'))return status('Cancelled. Cloud and this device unchanged.');
+    backup();
+    archiveCloud(prior);
+    if(!confirm('Both safety backups requested. Confirm this MOBILE has the most complete verified Aerovex data. Replace ONLY the OLD cloud copy with this MOBILE data? All other PC-only entries must be reviewed separately.'))return status('Cancelled. Both backups were prepared; cloud unchanged.');
+    const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(prior.updated_at)+'&select=updated_at';
+    const result=await send(where,'PATCH',{payload:source,updated_at:new Date().toISOString()},{Prefer:'return=representation'});
+    if(!Array.isArray(result)||result.length!==1)return stop('Cloud changed while preparing recovery. Nothing overwritten. Save latest backups before retrying.');
+    role('mobile');baseline=stable(source);stamp=result[0].updated_at;paused=false;online=true;start();
+    status('✓ Old cloud replaced with the verified Mobile copy. No mobile records deleted. On PC choose Join after taking its Backup.');
+  }catch(e){status('Recovery did not complete: '+e.message+'. Do NOT restore anything until backups checked.')}
+  finally{busy=false}
+}
+
 /* Conservative three-way merge for concurrent use of Mobile and PC.
    Unchanged records retain their exact values. Concurrent edits to the same
    existing record never merge silently. New records must have unique IDs.
@@ -241,7 +305,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set on your mobile and PC. Changes appear automatically about every 8 seconds while the ERP is open and online.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Mobile: Initialize Shared Data</button><p><button type="button" id="ax2Join">2B. PC: Join Existing Shared Data</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set on your mobile and PC. Changes appear automatically about every 8 seconds while the ERP is open and online.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Mobile: Initialize Shared Data</button><p><button type="button" id="ax2Join">2B. PC: Join Existing Shared Data</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -249,6 +313,7 @@ function panel(){
  $('ax2Init').onclick=initial;
  $('ax2Join').onclick=join;
  $('ax2Resume').onclick=resume;
+ $('ax2Repair').onclick=repairOldCloud;
  status(lastMessage);
 }
 function init(){
