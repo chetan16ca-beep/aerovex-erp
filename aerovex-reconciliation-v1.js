@@ -38,11 +38,14 @@ function gstRows(){
 function showGST(records){
  const idx=new Map();records.forEach(o=>{const k=key(o.gstin,o.invoice);idx.set(k,[...(idx.get(k)||[]),o])});
  const existing=gstRows(),out=[],seen=new Set();
+ const erpCount=new Map();for(const a of existing){const k=key(a.gstin,a.ref);if(a.gstin&&a.ref)erpCount.set(k,(erpCount.get(k)||0)+1)}
  for(const a of existing){
   const k=key(a.gstin,a.ref),valid=a.gstin&&a.ref&&a.amount!==null;
   let label='Needs ERP details',reported='',difference='';
   if(valid){
    const found=idx.get(k)||[];
+   if((erpCount.get(k)||0)>1)label='Duplicate ERP supplier bills — review';
+   else
    if(found.length===0)label='Not in imported file';
    else if(found.length>1)label='Duplicate imported rows — review';
    else{
