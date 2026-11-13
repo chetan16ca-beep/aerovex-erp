@@ -7,7 +7,7 @@
 if(typeof db==='undefined'||typeof show!=='function')return;
 const K='aerovex-print-themes-v1';
 const names={corporate:'Premium Corporate (Navy + Gold)',gst:'Modern GST (Blue + White)',minimal:'Minimal Professional (B/W)'};
-const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;':'&quot;',"'":'&#39;'}[c]));
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const S=v=>String(v??'').trim();
 const N=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
 const M=v=>v===undefined||v===null||v===''||N(v)===null?'Not recorded':'₹ '+N(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
