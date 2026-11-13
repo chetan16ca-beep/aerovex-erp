@@ -16,7 +16,9 @@ industrial:'06 • Industrial B2B — Bold',
 compact:'07 • Compact A4 — Space Saver',
 ledger:'08 • Chartered Ledger — Formal',
 editorial:'09 • Editorial Signature — Designer',
-blueprint:'10 • Technical Blueprint — Engineering'
+blueprint:'10 • Technical Blueprint — Engineering',
+tally:'11 • Accounting Register — Tally-style',
+sap:'12 • Enterprise Billing — SAP-style'
 };
 const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const S=v=>String(v??'').trim();
@@ -99,6 +101,29 @@ function bank(){
  const shown=fields.filter(z=>S(z[1]));
  return shown.length?'<div class="axBank axPaperCard"><div class="axLabel">Bank Details</div>'+shown.map(z=>'<div>'+E(z[0])+': <b>'+E(z[1])+'</b></div>').join('')+'</div>':'';
 }
+
+/* Accounting-register format: separate goods register, quantity / rate / per / amount columns. */
+function tallyFormat(x,k,no,head,terms,total,bankBlock,sign,foot){
+ const a=db?.companySettings||{},haveLogo=hasBrandLogo(),h=k==='quote'?'QUOTATION':'TAX INVOICE';
+ const details=rows(x).map((z,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+E(z.description||'Description unavailable')+'</b><div class="axMuted">'+[S(z.moc)?'MOC '+S(z.moc):'',S(z.size)?'SIZE '+S(z.size):'',S(z.micron)?'MICRON '+S(z.micron):''].filter(Boolean).map(E).join(' / ')+'</div></td><td>'+E(z.hsn||x.hsn||'—')+'</td><td>'+E(z.qty??'—')+'</td><td>'+M(z.rate)+'</td><td>'+E(z.unit||x.unit||'—')+'</td><td>'+price(z)+'</td></tr>').join('');
+ const left='<div class="axAccountingSeller">'+logo()+'<div>'+(haveLogo?'':'<h1>AEROVEX FILTRATION</h1>')+'<div>Smart Filtration Solutions</div>'+(a.address?'<div>'+E(a.address)+'</div>':'')+companyHeader(x)+'</div></div>';
+ return '<div class="axAccountingFrame"><div class="axAccountingLabel">'+h+'</div><header class="axAccountingHeader">'+left+'<div class="axAccountingNumber"><strong>'+h+'</strong><span>No. '+E(no)+'</span><span>Dated: '+E(x.date||'—')+'</span></div></header>'+
+ '<div class="axAccountingParties"><section><small>'+(k==='quote'?'Quotation to':'Buyer / Bill to')+'</small><b>'+E(x.party||'—')+'</b><div>'+E(x.address||'')+'</div><div>Customer GSTIN: '+E(x.gstin||'—')+'</div></section><section><div>Reference / PO: <b>'+E(x.ref||x.poRef||'—')+'</b></div><div>Place of supply: <b>'+E(x.place||'—')+'</b></div><div>Delivery location: <b>'+E(x.deliveryLocation||'—')+'</b></div>'+(k==='quote'?'<div>Validity: '+E(x.validity||'—')+' days</div>':'')+'</section></div>'+
+ '<table class="axAccountingItems"><thead><tr><th>Sl.</th><th>DESCRIPTION OF GOODS</th><th>HSN/SAC</th><th>QTY</th><th>RATE</th><th>PER</th><th>AMOUNT</th></tr></thead><tbody>'+details+'</tbody></table>'+
+ '<div class="axAccountingBottom"><section><h3>TERMS / BANK DETAILS</h3>'+terms+bankBlock+'</section><section><h3>ACCOUNT SUMMARY</h3>'+total+'</section></div>'+
+ '<div class="axAccountingSignature"><div>Declaration: Please verify all recorded details before issuing.</div>'+sign+'</div></div>'+foot;
+}
+/* Enterprise print: sales-document control, sold-to / ship-to, line codes and pricing summary. */
+function sapFormat(x,k,no,head,terms,total,bankBlock,sign,foot){
+ const h=k==='quote'?'SALES QUOTATION':'BILLING DOCUMENT';
+ const details=rows(x).map((z,i)=>'<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td><b>'+E(z.description||'Description unavailable')+'</b><div class="axMuted">'+[S(z.moc)?'MOC '+S(z.moc):'',S(z.size)?'SIZE '+S(z.size):'',S(z.micron)?'MICRON '+S(z.micron):''].filter(Boolean).map(E).join(' / ')+'</div></td><td>'+E(z.hsn||x.hsn||'—')+'</td><td>'+E(z.qty??'—')+'</td><td>'+E(z.unit||x.unit||'—')+'</td><td>'+M(z.rate)+'</td><td>'+price(z)+'</td></tr>').join('');
+ return '<div class="axEnterprise"><header class="axEnterpriseHead"><div class="axEnterpriseIssuer">'+logo()+'<div>'+(hasBrandLogo()?'':'<h1>AEROVEX FILTRATION</h1>')+'<small>Smart Filtration Solutions</small>'+companyHeader(x)+'</div></div><div class="axEnterpriseDoc"><small>COMMERCIAL DOCUMENT</small><h2>'+h+'</h2><b>'+E(no)+'</b></div></header>'+
+ '<div class="axEnterpriseControl"><div><small>DOCUMENT NO.</small><b>'+E(no)+'</b></div><div><small>DATE</small><b>'+E(x.date||'—')+'</b></div><div><small>PO REFERENCE</small><b>'+E(x.ref||x.poRef||'—')+'</b></div><div><small>SUPPLY LOCATION</small><b>'+E(x.place||'—')+'</b></div></div>'+
+ '<div class="axEnterpriseClients"><section><h3>'+(k==='quote'?'QUOTATION RECIPIENT':'SOLD-TO PARTY')+'</h3><b>'+E(x.party||'—')+'</b><div>'+E(x.address||'')+'</div><div>GSTIN '+E(x.gstin||'—')+'</div></section><section><h3>SHIP-TO / DELIVER TO</h3><div>'+E(x.deliveryLocation||'—')+'</div><div>Attention: '+E(x.attention||'—')+'</div></section></div>'+
+ '<div class="axEnterpriseBand"><strong>10 / MATERIAL & SERVICE OVERVIEW</strong><span>'+rows(x).length+' LINE(S)</span></div><table class="axEnterpriseItems"><thead><tr><th>ITEM</th><th>MATERIAL / DESCRIPTION</th><th>HSN</th><th>QTY</th><th>UOM</th><th>NET RATE</th><th>NET VALUE</th></tr></thead><tbody>'+details+'</tbody></table>'+
+ '<div class="axEnterpriseLower"><section><h3>20 / COMMERCIAL CONDITIONS</h3>'+terms+bankBlock+'</section><section><h3>30 / PRICING & TAX</h3>'+total+'</section></div><footer class="axEnterpriseFooter"><div>Smart Filtration Solutions • Document '+E(no)+'</div>'+sign+'</footer></div>'+foot;
+}
+
 function doc(x,k,t){
  const isQ=k==='quote',no=title(x,k,0),head=isQ?'TECHNO-COMMERCIAL QUOTATION':'TAX INVOICE';
  const items=rows(x).map((z,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+E(z.description||'Description unavailable')+'</b><div class="axMuted">'+[S(z.moc)?'MOC: '+S(z.moc):'',S(z.micron)?'Micron: '+S(z.micron):'',S(z.size)?'Size: '+S(z.size):''].filter(Boolean).map(E).join(' | ')+'</div></td><td>'+E(z.hsn||x.hsn||'—')+'</td><td>'+E(z.qty??'—')+' '+E(z.unit??x.unit??'')+'</td><td>'+M(z.rate)+'</td><td>'+price(z)+'</td></tr>').join('');
@@ -123,6 +148,8 @@ function doc(x,k,t){
  const bankBlock=bank();
  let layout;
  switch(t){
+  case 'tally':layout=tallyFormat(x,k,no,head,terms,total,bankBlock,sign,foot);break;
+  case 'sap':layout=sapFormat(x,k,no,head,terms,total,bankBlock,sign,foot);break;
   case 'gst':
    layout='<div class="axTaxStrip"><span>GST-READY DOCUMENT • CLIENT COPY</span><span>Original / Client Copy</span></div><div class="axHeader">'+brand+docid+'</div>'+info+itemTable+'<div class="axTwo"><div>'+bankBlock+terms+'</div>'+total+'</div>'+sign+foot;break;
   case 'minimal':
@@ -176,7 +203,7 @@ function printDoc(){
  w.document.close();w.focus();setTimeout(()=>w.print(),350);
 }
 window.axDocumentThemeStudio=function(){
- show('Aerovex Document Theme Studio','<div id="axTSApp"><p>10 distinct A4 designs (not just colors). Suggested: Global MNC for Quotation and GST Precision for Bill. Preview/Print only; saved document values are never changed.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Document type<select id="axTSKind"><option value="quote">Quotation</option><option value="invoice">Tax Invoice</option></select></label><label>Saved document<select id="axTSDoc"></select></label><label>Print theme<select id="axTSTheme">'+Object.entries(names).map(([v,n])=>'<option value="'+v+'">'+E(n)+'</option>').join('')+'</select></label></div><p><button id="axTSSaveTheme" type="button">Save Theme Preference</button> <button id="axTSPrint" class="primary" type="button">Print / Save PDF</button></p><p id="axTSNotice" role="status"></p><div id="axTSPreview"></div></div>');
+ show('Aerovex Document Theme Studio','<div id="axTSApp"><p>12 distinct A4 designs (not just colors). Suggested: Global MNC for Quotation and GST Precision for Bill. Preview/Print only; saved document values are never changed.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Document type<select id="axTSKind"><option value="quote">Quotation</option><option value="invoice">Tax Invoice</option></select></label><label>Saved document<select id="axTSDoc"></select></label><label>Print theme<select id="axTSTheme">'+Object.entries(names).map(([v,n])=>'<option value="'+v+'">'+E(n)+'</option>').join('')+'</select></label></div><p><button id="axTSSaveTheme" type="button">Save Theme Preference</button> <button id="axTSPrint" class="primary" type="button">Print / Save PDF</button></p><p id="axTSNotice" role="status"></p><div id="axTSPreview"></div></div>');
  document.getElementById('axTSKind').onchange=redraw;
  document.getElementById('axTSDoc').onchange=renderPreview;
  document.getElementById('axTSTheme').onchange=renderPreview;
@@ -188,7 +215,7 @@ function install(){
  if(document.getElementById('axThemePanel'))return;
  const spot=document.getElementById('accounts')?.closest('.panel')||document.querySelector('main');if(!spot)return;
  const panel=document.createElement('section');panel.className='panel';panel.id='axThemePanel';
- panel.innerHTML='<div class="panelHead"><h2>Document Theme Studio</h2><span>Aerovex Quotations & Invoices</span></div><div><button type="button" id="axThemeOpen" class="primary">🎨 Preview Premium Print Themes</button><p style="font-size:12px;color:#64748b">10 different A4 layouts • Quotation & Tax Invoice • Real header, table, summary and footer variations.</p></div>';
+ panel.innerHTML='<div class="panelHead"><h2>Document Theme Studio</h2><span>Aerovex Quotations & Invoices</span></div><div><button type="button" id="axThemeOpen" class="primary">🎨 Preview Premium Print Themes</button><p style="font-size:12px;color:#64748b">12 different A4 layouts • Includes Accounting Register and Enterprise Billing for Quotation & Tax Invoice.</p></div>';
  spot.insertAdjacentElement('afterend',panel);
  document.getElementById('axThemeOpen').onclick=window.axDocumentThemeStudio;
 }
