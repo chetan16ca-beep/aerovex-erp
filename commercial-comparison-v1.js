@@ -20,6 +20,14 @@ const lines=x=>Array.isArray(x.items)&&x.items.length?x.items:(x.description?[x]
 const id=(x,kind,i)=>str(x.quotationNo||x.orderNo||x.documentNo||x.ref)||kind+' #'+(i+1);
 const td=(v,extra='')=>'<td'+extra+'>'+esc(v)+'</td>';
 const caution='<p class="axCMPNote">Comparison is advisory and cannot post, edit or approve Sales Orders automatically. Verify actual PO, tax breakup and commercial terms before proceeding.</p>';
+function exportCommercialBackup(){
+ const payload={application:'Aerovex Commercial Verification',createdAt:new Date().toISOString(),formatVersion:1,poReviews:load(QKEY),supplierBids:load(SKEY)};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='Aerovex-Commercial-Review-Backup-'+new Date().toISOString().slice(0,10)+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
 const css=document.createElement('style');
 css.textContent='.axCMP{font:14px Arial,sans-serif;color:#17364b}.axCMP label{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:12px}.axCMP input,.axCMP select,.axCMP textarea{padding:10px;border:1px solid #a9c2d1;border-radius:7px;min-width:0;box-sizing:border-box;width:100%}.axCMP form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.axCMP .full{grid-column:1/-1}.axCMP .axCMPTable{overflow:auto;margin:12px 0}.axCMP table{width:100%;min-width:670px;border-collapse:collapse;font-size:12px}.axCMP td,.axCMP th{border:1px solid #d5e4ec;padding:9px;text-align:left}.axCMP th{background:#eaf3f8}.axCMPNote{font-size:12px;background:#f5f8fa;padding:10px;border-left:3px solid #55758b;line-height:1.6}.axCMPWarn{color:#a02020;font-weight:700}.axCMPGood{color:#23724b;font-weight:700}.axCMPTiles{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.axCMPTiles button{padding:12px;border:1px solid #c4dbe6;border-radius:9px;background:#eaf5fa;color:#0d4c6a;font-weight:700}';
 document.head.appendChild(css);
@@ -141,11 +149,12 @@ window.axSupplierRateComparison=function(){
 function install(){
  const main=document.querySelector('main');if(!main||$('axCMPPanel'))return;
  const panel=document.createElement('section');panel.id='axCMPPanel';panel.className='panel';
- panel.innerHTML='<div class="panelHead"><h2>Commercial Verification</h2><span>Non-destructive review tools</span></div><div class="axCMPTiles"><button type="button" id="axCMPOpenPO">Customer PO ↔ Quotation</button><button type="button" id="axCMPOpenSupplier">Supplier Rate Comparison</button></div>';
+ panel.innerHTML='<div class="panelHead"><h2>Commercial Verification</h2><span>Non-destructive review tools</span></div><div class="axCMPTiles"><button type="button" id="axCMPOpenPO">Customer PO ↔ Quotation</button><button type="button" id="axCMPOpenSupplier">Supplier Rate Comparison</button><button type="button" id="axCMPDownloadBackup">Download Commercial Backup</button></div>';
  const account=$('accounts')?.closest('.panel');
  if(account)account.insertAdjacentElement('afterend',panel);else main.appendChild(panel);
  $('axCMPOpenPO').onclick=window.axPOQuotationMatching;
  $('axCMPOpenSupplier').onclick=window.axSupplierRateComparison;
+ $('axCMPDownloadBackup').onclick=exportCommercialBackup;
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
