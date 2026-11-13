@@ -34,6 +34,7 @@ function logo(){
  return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(data)?'<img class="axLogo" src="'+E(data)+'" alt="Aerovex logo">':'';
 }
 
+function hasBrandLogo(){return !!logo()}
 function css(theme){
  const palettes={
  corporate:['#102e4b','#c7a267','#f4f6f8'],
@@ -111,19 +112,19 @@ function doc(x,k,t){
  const total='<div class="axTotals"><p><span>Taxable Value</span><b>'+M(x.taxable)+'</b></p>'+gstParts+'<div class="axGrand"><span>GRAND TOTAL</span><span>'+M(x.total??x.amount)+'</span></div></div>';
  const terms='<div class="axTerms axPaperCard"><div class="axLabel">Terms & Conditions</div><div>Payment: '+E(x.payment||'—')+'</div><div>Delivery: '+E(x.delivery||'—')+'</div><div>Freight: '+E(x.freight||'—')+'</div>'+(x.packing?'<div>Packing: '+E(x.packing)+'</div>':'')+(x.warranty?'<div>Warranty: '+E(x.warranty)+'</div>':'')+(x.remarks?'<div>Remarks: '+E(x.remarks)+'</div>':'')+'</div>';
  const sign='<div class="axSign"><b>For AEROVEX FILTRATION</b><div style="margin-top:34px">Authorized Signatory</div></div>';
- const foot='<div class="axFoot">AEROVEX FILTRATION • Smart Filtration Solutions. Verify document reference, HSN, GST and banking details before sharing.</div>';
- const issuer='<div class="axIssuer axPaperCard"><h1>AEROVEX FILTRATION</h1><div>Smart Filtration Solutions</div>'+companyHeader(x)+'</div>';
+ const foot='<div class="axFoot">Smart Filtration Solutions • '+(hasBrandLogo()?'':'AEROVEX FILTRATION • ')+'Document reference, HSN, GST and bank details should be verified before issue.</div>';
+ const issuer='<div class="axIssuer axPaperCard">'+(hasBrandLogo()?'':'<h1>AEROVEX FILTRATION</h1>')+'<div>Smart Filtration Solutions</div>'+companyHeader(x)+'</div>';
  const brand='<div class="axHeadLeft">'+logo()+issuer+'</div>';
  const docid='<div class="axDocIdentity axPaperCard"><h2>'+head+'</h2><strong>'+E(no)+'</strong><div>Date: '+E(x.date||'—')+'</div>'+(isQ?'<div>Revision: '+E(x.revision||'—')+'</div><div>Validity: '+E(x.validity||'—')+' days</div>':'')+'</div>';
  const buyer='<div class="axPaperCard"><div class="axLabel">'+(isQ?'Quotation To':'Bill To')+'</div><b>'+E(x.party||'—')+'</b><div>'+E(x.address||'')+'</div><div>Customer GSTIN: '+E(x.gstin||'—')+'</div></div>';
  const reference='<div class="axPaperCard"><div class="axLabel">Reference / Delivery</div><div>RFQ / PO: '+E(x.ref||x.poRef||'—')+'</div><div>Place of supply: '+E(x.place||'—')+'</div><div>Attention: '+E(x.attention||'—')+'</div>'+(x.deliveryLocation?'<div>Delivery location: '+E(x.deliveryLocation)+'</div>':'')+'</div>';
  const info='<div class="axInfo">'+buyer+reference+'</div>';
- const issuerMini='<div class="axPaperCard"><b>AEROVEX FILTRATION</b><div>Smart Filtration Solutions</div>'+companyHeader(x)+'</div>';
+ const issuerMini='<div class="axPaperCard">'+(hasBrandLogo()?'':'<b>AEROVEX FILTRATION</b>')+'<div>Smart Filtration Solutions</div>'+companyHeader(x)+'</div>';
  const bankBlock=bank();
  let layout;
  switch(t){
   case 'gst':
-   layout='<div class="axTaxStrip"><span>GST-READY DOCUMENT • AEROVEX FILTRATION</span><span>Original / Client Copy</span></div><div class="axHeader">'+brand+docid+'</div>'+info+itemTable+'<div class="axTwo"><div>'+bankBlock+terms+'</div>'+total+'</div>'+sign+foot;break;
+   layout='<div class="axTaxStrip"><span>GST-READY DOCUMENT • CLIENT COPY</span><span>Original / Client Copy</span></div><div class="axHeader">'+brand+docid+'</div>'+info+itemTable+'<div class="axTwo"><div>'+bankBlock+terms+'</div>'+total+'</div>'+sign+foot;break;
   case 'minimal':
    layout='<div class="axMinimalTop"><div>'+brand+'</div><div><h2>'+head+'</h2><b>'+E(no)+'</b><div>'+E(x.date||'—')+'</div></div></div>'+info+itemTable+total+'<div class="axTwo">'+terms+bankBlock+'</div>'+sign+foot;break;
   case 'modernbox':
