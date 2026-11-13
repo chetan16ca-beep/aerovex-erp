@@ -144,6 +144,8 @@ const oldQuote=window.axCorporateQuotation;
 if(typeof oldQuote==='function')window.axCorporateQuotation=function(){const out=oldQuote.apply(this,arguments);appendAddressFields(document.getElementById('axMncQuote')||document.getElementById('axQuoteForm'),'quotation');return out};
 const oldDetailed=window.axDetailedDocument;
 if(typeof oldDetailed==='function')window.axDetailedDocument=function(t){const out=oldDetailed.apply(this,arguments);if(t==='Purchase Order'||t==='Sales Invoice')appendAddressFields(document.getElementById('axDocForm'),t==='Purchase Order'?'purchaseOrder':'invoice');return out};
+const oldInvoiceForm=window.invoiceForm;
+if(typeof oldInvoiceForm==='function')window.invoiceForm=function(){const out=oldInvoiceForm.apply(this,arguments);appendAddressFields(document.querySelector('#modalBody form.form'),'invoice');return out};
 const oldEdit=window.axEditSavedDocument;
 if(typeof oldEdit==='function')window.axEditSavedDocument=function(key,i){const out=oldEdit.apply(this,arguments);if(['quotations','invoices','purchaseOrders'].includes(key))fillAddressEditor(document.getElementById('axEditSavedForm'),db[key]?.[i]||{});return out};
 window.axQuotationPreview=function(i){return preview('quotation',i)};
@@ -167,8 +169,10 @@ window.axSAPPrintCurrent=print;
 const originalStudio=window.axDocumentThemeStudio;
 if(typeof originalStudio==='function')window.axDocumentThemeStudio=function(){
  const out=originalStudio.apply(this,arguments);
- const theme=document.getElementById('axTSTheme');
- if(theme){theme.value='sap';if(typeof theme.onchange==='function')theme.onchange()}
+ const theme=document.getElementById('axTSTheme'),kind=document.getElementById('axTSKind');
+ const selectSAP=()=>{const t=document.getElementById('axTSTheme');if(t){t.value='sap';if(typeof t.onchange==='function')t.onchange()}};
+ if(kind&&typeof kind.onchange==='function'){const originalKindChange=kind.onchange;kind.onchange=function(){originalKindChange.apply(this,arguments);selectSAP()}}
+ selectSAP();
  return out;
 };
 function install(){
@@ -177,5 +181,7 @@ function install(){
  button.onclick=()=>{if(typeof window.axDetailedDocument==='function')window.axDetailedDocument('Purchase Order')};
  quick.appendChild(button);
 }
+const previousRender=window.render;
+if(typeof previousRender==='function')window.render=function(){const result=previousRender.apply(this,arguments);install();return result};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
