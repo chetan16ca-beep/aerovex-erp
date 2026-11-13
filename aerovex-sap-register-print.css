@@ -1,0 +1,26 @@
+/* Unified SAP-inspired register print — A4 landscape to preserve production columns. */
+.axSapRegister{color:#203745;background:#fff;padding:14px;font:11px/1.5 "Segoe UI",Arial,sans-serif;max-width:1150px;margin:0 auto;box-sizing:border-box;overflow-wrap:anywhere}
+.axSapRegister *{box-sizing:border-box}
+.axSapRegHead{display:flex;justify-content:space-between;align-items:center;gap:25px;padding:16px 14px 11px;border-top:6px solid #12688f;border-bottom:1px solid #a5c6d7;background:#fff}
+.axSapRegHead>div:last-child{text-align:right}
+.axSapRegHead h1,.axSapRegHead h2{color:#16618a;margin:0;font-size:20px;line-height:1.2}
+.axSapRegHead h2{font-size:18px}
+.axSapRegHead small,.axSapRegHead span{display:block;color:#52788c;font-size:9px}
+.axSapRegCompany{display:flex;align-items:center;gap:15px}
+.axSapRegLogo{display:block;width:160px;height:100px;object-fit:contain;object-position:center}
+.axSapRegControls{display:flex;align-items:center;justify-content:space-between;gap:15px;background:#e8f4f9;border-bottom:1px solid #a5c6d7;padding:6px 9px;color:#205b78;font-size:10px;font-weight:650}
+.axSapRegTable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}
+.axSapRegTable th{background:#e4f0f6;color:#155a7a;font-weight:750;border-bottom:2px solid #176a91}
+.axSapRegTable th,.axSapRegTable td{padding:7px 6px;text-align:left;vertical-align:top;border-right:1px solid #d2e3ea;border-bottom:1px solid #c5dbe7;overflow-wrap:anywhere}
+.axSapRegTable td:nth-child(1),.axSapRegTable th:nth-child(1){width:5%}
+.axSapRegTable td:nth-child(2),.axSapRegTable th:nth-child(2){width:15%}
+.axSapRegTable td:nth-child(3),.axSapRegTable th:nth-child(3){width:12%}
+.axSapRegTable td:nth-child(4),.axSapRegTable th:nth-child(4){width:18%}
+.axSapRegTable td:nth-child(5),.axSapRegTable th:nth-child(5){width:28%}
+.axSapRegTable td:nth-child(6),.axSapRegTable th:nth-child(6){width:13%}
+.axSapRegTable td:nth-child(7),.axSapRegTable th:nth-child(7){width:9%}
+.axSapRegister footer{border-top:1px solid #b5d0df;margin-top:22px;padding:10px 5px;color:#557588;display:flex;justify-content:space-between;gap:10px}
+.axSapRegTable tr{break-inside:avoid}
+@page{size:A4 landscape;margin:12mm}
+@media print{html,body{margin:0;padding:0;background:#fff}.axSapRegister{max-width:none;padding:0}.axSapRegControls,.axSapRegTable th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media screen and (max-width:800px){.axSapRegister{min-width:760px}.axSapRegHead{padding:12px}.axSapRegLogo{width:130px;height:85px}}
