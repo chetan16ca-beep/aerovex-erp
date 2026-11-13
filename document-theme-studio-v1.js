@@ -76,7 +76,7 @@ function tax(x){
 }
 function finance(x){return '<div class="axFinance"><div class="axMoneyRow"><span>Taxable Value</span><b>'+money(x.taxable)+'</b></div>'+tax(x)+'<div class="axGrand"><span>GRAND TOTAL</span><strong>'+money(x.total??x.amount)+'</strong></div></div>'}
 function terms(x){
- const cfg=settings();return '<section class="axTerms"><h3>COMMERCIAL TERMS</h3><div>Payment: '+esc(x.payment||'—')+'</div><div>Delivery: '+esc(x.delivery||'—')+'</div><div>Freight / Packing: '+esc(x.freight||x.packing||'—')+'</div>'+(x.remarks?'<div>Remarks: '+esc(x.remarks)+'</div>':'')+(cfg.terms?'<div class="axOwnTerms">'+esc(cfg.terms)+'</div>':'')+'</section>';
+ const cfg=settings();return '<section class="axTerms"><h3>COMMERCIAL TERMS</h3><div>Payment: '+esc(x.payment||'—')+'</div><div>Delivery: '+esc(x.delivery||'—')+'</div>'+(x.deliveryLocation?'<div>Delivery Location: '+esc(x.deliveryLocation)+'</div>':'')+(x.validity?'<div>Validity: '+esc(x.validity)+' days</div>':'')+(x.freight?'<div>Freight: '+esc(x.freight)+'</div>':'')+(x.packing?'<div>Packing: '+esc(x.packing)+'</div>':'')+(x.warranty?'<div>Warranty: '+esc(x.warranty)+'</div>':'')+(x.remarks?'<div>Remarks: '+esc(x.remarks)+'</div>':'')+(cfg.terms?'<div class="axOwnTerms">'+esc(cfg.terms)+'</div>':'')+'</section>';
 }
 function bank(){
  const a=settings(),fields=[['Bank',a.bankName],['Account Name',a.accountName],['Account Number',a.accountNo],['IFSC',a.ifsc],['Branch',a.branch]].filter(v=>s(v[1]));
@@ -109,7 +109,7 @@ function layout(theme,x,k,i){
  default:throw Error('Invalid theme ID');
  }
 }
-function docHTML(x,k,t,i){return '<article class="axTSPaper axTS-'+esc(t)+'" data-layout="'+esc(t)+'">'+layout(t,x,k,i)+'<footer class="axLegal">Rendered from saved Aerovex ERP records · Please verify HSN, GST, bill number and terms before sharing.</footer></article>'}
+function docHTML(x,k,t,i){return '<article class="axTSPaper axTS-'+esc(t)+'" data-layout="'+esc(t)+'">'+layout(t,x,k,i)+'<footer class="axLegal">AEROVEX FILTRATION · Smart Filtration Solutions</footer></article>'}
 function redraw(){
  if(!$('axTSApp'))return;
  const k=kind(),arr=docs(k),sel=$('axTSDoc'),before=sel.value;
