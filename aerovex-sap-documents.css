@@ -1,0 +1,62 @@
+/* Aerovex Unified Enterprise Documents — Quotations / Invoices / Purchase Orders.
+   Independent A4 print layout; prices from saved records only. */
+.axSAPDocument{font:11px/1.5 "Segoe UI",Arial,Helvetica,sans-serif;color:#203a4a;background:#fff;width:100%;max-width:800px;min-width:650px;margin:0 auto;padding:12px;box-sizing:border-box;overflow-wrap:anywhere}
+.axSAPDocument *{box-sizing:border-box}
+.axSAPDocument h1,.axSAPDocument h2,.axSAPDocument h3,.axSAPDocument p{margin:0}
+.axSAPDocument .axSAPDocumentHead{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:122px;border-top:6px solid #12638e;border-bottom:1px solid #a6c4d2;padding:18px 12px 10px;background:#fff;position:static;height:auto;z-index:auto}
+.axSAPDocument .axSAPCompany{display:flex;align-items:center;gap:14px;min-width:0}
+.axSAPDocument .axSapLogo{display:block;width:153px;height:94px;max-width:153px;max-height:94px;object-fit:contain;object-position:center;flex-shrink:0}
+.axSAPDocument .axSAPCompany h1{font-size:18px;font-weight:750;color:#13587e;letter-spacing:.03em}
+.axSAPDocument .axSAPCompany small{display:block;color:#5f7890;font-size:10px;margin-bottom:5px}
+.axSAPDocument .axSAPCompany>div div{font-size:9px;line-height:1.5}
+.axSAPDocument .axSAPDocIdentity{text-align:right;flex-shrink:0}
+.axSAPDocument .axSAPDocIdentity small{display:block;color:#5c7f90;font-size:8px;letter-spacing:.08em}
+.axSAPDocument .axSAPDocIdentity h2{font-size:21px;color:#14658d;font-weight:750}
+.axSAPDocument .axSAPDocIdentity strong{display:block;font-size:12px;color:#293f4c}
+.axSAPDocument .axSAPDocMeta{display:grid;grid-template-columns:1fr .86fr 1.22fr 1fr;border-bottom:1px solid #a6c4d2;background:#e9f4fa}
+.axSAPDocument .axSAPDocMeta>div{padding:5px 8px;min-height:0;border-right:1px solid #cfdee6;line-height:1.25;overflow-wrap:anywhere}
+.axSAPDocument .axSAPDocMeta small{font-size:8px;display:block;color:#457188;margin-bottom:3px}
+.axSAPDocument .axSAPDocMeta b{font-size:10px;display:block;font-weight:650}
+.axSAPDocument .axSAPAddressGrid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #a6c4d2}
+.axSAPDocument .axSAPAddressGrid.axSAPTriple{grid-template-columns:1fr 1fr 1fr}
+.axSAPDocument .axSAPAddress{padding:10px;border-right:1px solid #cfdee6;min-height:115px}
+.axSAPDocument .axSAPAddress:last-child{border-right:0}
+.axSAPDocument .axSAPAddress h3,.axSAPDocument .axSAPBottom h3{background:#e7f3f9;color:#14648c;font-size:10px;padding:6px;letter-spacing:.04em;font-weight:750;margin:0 0 9px}
+.axSAPDocument .axSapAddressContents{padding:0 4px;line-height:1.48}
+.axSAPDocument .axSAPMultiline{white-space:pre-wrap;margin:4px 0}
+.axSAPDocument .axSapMissing{color:#916a24;font-size:9px;font-style:italic}
+.axSAPDocument .axSAPBar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#176a93;color:#fff;padding:8px 10px;font-size:10px;margin-top:5px}
+.axSAPDocument .axSAPBar strong{font-weight:750}
+.axSAPDocument .axSAPDocTable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}
+.axSAPDocument .axSAPDocTable th,.axSAPDocument .axSAPDocTable td{padding:8px 5px;vertical-align:top;border-right:1px solid #d8e5ec;border-bottom:1px solid #bcd3df;text-align:left;overflow-wrap:anywhere}
+.axSAPDocument .axSAPDocTable th{background:#e9f3f8;color:#185c7b;font-size:9px;font-weight:700}
+.axSAPDocument .axSAPDocTable td small{display:block;font-size:9px;color:#6b8390;white-space:normal}
+.axSAPDocument .axSAPDocTable th:nth-child(1){width:7%}.axSAPDocument .axSAPDocTable th:nth-child(2){width:31%}.axSAPDocument .axSAPDocTable th:nth-child(3){width:11%}.axSAPDocument .axSAPDocTable th:nth-child(4){width:9%}.axSAPDocument .axSAPDocTable th:nth-child(5){width:9%}.axSAPDocument .axSAPDocTable th:nth-child(6){width:15%}.axSAPDocument .axSAPDocTable th:nth-child(7){width:18%}
+.axSAPDocument .axSAPBottom{display:grid;grid-template-columns:1fr .89fr;border-top:1px solid #a6c4d2;margin-top:16px}
+.axSAPDocument .axSAPBottom>div{padding:8px 10px;border-right:1px solid #bed1db}
+.axSAPDocument .axSAPBottom>div:last-child{border-right:0}
+.axSAPDocument .axSAPTerm{font-size:10px;margin:4px 0}
+.axSAPDocument .axSapBank{margin-top:13px;border-top:1px solid #d7e4eb;padding-top:10px;font-size:10px}
+.axSAPDocument .axSapBank h3{background:#edf6fa;margin:0 0 7px}
+.axSAPDocument .axSapBank>div{display:flex;justify-content:space-between;gap:10px;margin:2px 0}
+.axSAPDocument .axSapBank>div b{text-align:right}
+.axSAPDocument .axSAPSummary{font-size:10px}
+.axSAPDocument .axSAPSumRow{display:flex;justify-content:space-between;gap:12px;padding:6px 3px;border-bottom:1px solid #e0ebf0}
+.axSAPDocument .axSAPSumRow b{text-align:right}
+.axSAPDocument .axSAPGrand{display:flex;justify-content:space-between;gap:10px;background:#176a93;color:#fff;font-size:13px;font-weight:700;padding:10px 8px;margin-top:6px}
+.axSAPDocument .axSAPGrand strong{text-align:right}
+.axSAPDocument .axSAPEnd{display:flex;align-items:end;justify-content:space-between;gap:14px;border-top:1px solid #bfd3df;margin-top:15px;padding:10px 5px 5px;break-inside:avoid}
+.axSAPDocument .axSAPVerify{color:#657f8e;font-size:9px;max-width:53%}
+.axSAPDocument .axSAPSign{text-align:right;font-size:10px}
+.axSAPDocument .axSAPSignSpace{height:42px}
+.axSAPDocument .axSAPDocTable tr,.axSAPDocument .axSAPAddress,.axSAPDocument .axSAPBottom>div{break-inside:avoid}
+@page{size:A4;margin:11mm}
+@media print{
+ html,body{margin:0!important;padding:0!important;background:#fff!important}
+ .axSAPDocument{padding:0!important;width:100%!important;max-width:none!important;min-width:0!important;font-size:10px!important}
+ .axSAPDocument .axSAPDocMeta,.axSAPDocument .axSAPBar,.axSAPDocument .axSAPGrand,.axSAPDocument .axSAPAddress h3,.axSAPDocument .axSAPDocTable th{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+@media screen and (max-width:740px){
+ .axSAPDocument{width:740px;min-width:740px}
+ .axSAPDocViewport{overflow-x:auto}
+}
