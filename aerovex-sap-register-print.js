@@ -19,10 +19,10 @@ const products=x=>Array.isArray(x.items)&&x.items.length?x.items:[x];
 const desc=(x,key)=>key==='store'?[x.cloth&&'Cloth '+x.cloth,x.width&&'Width '+x.width,x.srl&&'SRL '+x.srl].filter(Boolean).join(' / '):products(x).map(z=>[z.description||z.name||z.product||z.cloth||'',z.moc||'',z.size||''].filter(Boolean).join(' / ')).filter(Boolean).join(' | ');
 const qty=(x,key)=>key==='store'?(x.balance??x.opening??'—')+' m':key==='workOrders'?'Order '+(x.qty??x.orderQty??'—')+' | Done '+(x.done??x.doneQty??'—'):products(x).map(z=>t(z.qty??z.quantity??'—')+' '+t(z.unit||'')).join(' / ');
 const logo=()=>{const x=localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x)?'<img src="'+E(x)+'" alt="Aerovex Filtration" class="axSapRegLogo">':''};
-function printRegister(key,ttl){
+function printRegister(key,ttl,onlyIndex=null){
  const type=k(key);
  if(!VALID.has(type))return false;
- const list=Array.isArray(db[type])?db[type]:[];
+ const list=Array.isArray(db[type])?(onlyIndex===null?db[type]:db[type].slice(onlyIndex,onlyIndex+1)):[];
  const hide=PROTECTED.has(type),details=names[type]||ttl||type;
  const head='<thead><tr><th>NO.</th><th>DOC / SRL NO.</th><th>DATE</th><th>PARTY / REFERENCE</th><th>ITEM / DETAILS</th><th>QTY / STATUS</th>'+(hide?'':'<th>VALUE</th>')+'</tr></thead>';
  const rows=list.map((x,i)=>'<tr><td>'+E(i+1)+'</td><td><b>'+E(ref(x))+'</b></td><td>'+E(x.date||x.createdAt||'—')+'</td><td>'+E(x.party||x.customer||x.supplier||x.person||x.name||'—')+'</td><td>'+E(desc(x,type)||x.remarks||x.remark||x.description||'—')+'</td><td>'+E(qty(x,type))+'</td>'+(hide?'':'<td>'+m(x.total??x.amount??(type==='store'?null:x.value))+'</td>')+'</tr>').join('');
@@ -47,7 +47,7 @@ function printSingle(key,i){
   return true;
  }
  // For detailed non-commercial records, the SAP-styled register lists all saved values without mutating them.
- return printRegister(type,names[type]);
+ return printRegister(type,names[type]+' — Single Record',i);
 }
 const previousList=window.axPrintList;
 window.axPrintList=function(key,title){
