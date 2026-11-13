@@ -104,8 +104,17 @@ window.productForm=function(){
   e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),m=axHSNLookup(o.hsn);
   if(!m)return alert('HSN '+code(o.hsn)+' ka GST rate Tax Master mein set karein.');
   o.hsn=code(o.hsn);o.gstRate=Number(m.rate);
-  const i=Number(f.dataset.editIndex);
-  if(f.dataset.editIndex!==undefined&&Number.isInteger(i)&&db.products[i]){
+  const i=Number(f.dataset.editIndex),editing=f.dataset.editIndex!==undefined&&Number.isInteger(i)&&!!db.products[i];
+  // Block exact duplicate products, but permit distinct width/micron/cloth variants.
+  const duplicate=db.products.findIndex((p,j)=>{
+   if(editing&&j===i)return false;
+   const sameItem=Boolean(norm(o.item)&&norm(p.item)&&norm(o.item)===norm(p.item));
+   const sameProduct=norm(p.name)===norm(o.name)&&
+    ['cloth','width','micron'].every(k=>norm(p[k])===norm(o[k]))&&code(p.hsn)===o.hsn;
+   return sameItem||sameProduct;
+  });
+  if(duplicate>=0){alert('This product already exists in Product Master (row '+(duplicate+1)+'). Select or Edit the existing product instead of creating a duplicate.');return}
+  if(editing){
    db.products[i]={...db.products[i],...o,code:db.products[i].code};
   }else db.products.push(o);
   save();productForm();render();

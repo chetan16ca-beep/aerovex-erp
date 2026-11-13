@@ -3,7 +3,7 @@
 'use strict';
 if(typeof db==='undefined'||typeof show!=='function'||typeof render!=='function')return;
 const KEY='aerovex-erp-data-v1',SNAP='aerovex-erp-prechange-v30';
-const titles=['Payment & Outstanding','Purchase Management','Dispatch Tracking','Quotation Follow-up','Rate & Margin History','Security & Backup','Sales Analytics','CFM Integration'];
+const titles=['Payment & Outstanding','Purchase Management','Dispatch Tracking','Quotation Follow-up','Rate & Margin History','Security & Backup','Sales Analytics'];
 const E=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const N=x=>{const n=Number(x);return Number.isFinite(n)?n:0};
 const R=x=>Math.round((N(x)+Number.EPSILON)*100)/100;
@@ -214,7 +214,7 @@ function cfmScreen(){
 const views={
  'Payment & Outstanding':paymentScreen,'Purchase Management':purchaseScreen,'Dispatch Tracking':dispatchScreen,
  'Quotation Follow-up':followScreen,'Rate & Margin History':rateScreen,'Security & Backup':securityScreen,
- 'Sales Analytics':analyticsScreen,'CFM Integration':cfmScreen
+ 'Sales Analytics':analyticsScreen
 };
 const originalOpen=window.openModule;
 window.openModule=function(name){if(views[name])return views[name]();return originalOpen.apply(this,arguments)};
@@ -222,9 +222,9 @@ function insert(){
  if(document.querySelector('#axAdvancedPanel'))return;
  const main=document.querySelector('main');if(!main)return;
  const panel=document.createElement('section');panel.id='axAdvancedPanel';panel.className='panel';
- panel.innerHTML='<div class="panelHead"><h2>Advanced Business Controls <small>V30</small></h2><span>8 New Modules • Existing Records Protected</span></div><div class="axNextTiles"></div>';
+ panel.innerHTML='<div class="panelHead"><h2>Advanced Business Controls <small>V30</small></h2><span>7 Aerovex Modules • Existing Records Protected</span></div><div class="axNextTiles"></div>';
  const grid=panel.querySelector('.axNextTiles');
- const icons=['₹','🛒','🚚','📞','📈','🔒','📊','🏭'];
+ const icons=['₹','🛒','🚚','📞','📈','🔒','📊'];
  titles.forEach((t,i)=>{const b=document.createElement('button');b.type='button';b.textContent=icons[i]+' '+t;b.addEventListener('click',()=>views[t]());grid.appendChild(b)});
  const quick=document.querySelector('#quick')?.closest('.panel');if(quick)quick.insertAdjacentElement('afterend',panel);else main.prepend(panel);
 }
