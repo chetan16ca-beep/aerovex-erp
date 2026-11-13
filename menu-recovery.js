@@ -11,6 +11,7 @@ const routing={
  'Bank & Terms Settings':()=>(typeof window.axBankTermsSettings==='function'?window.axBankTermsSettings():window.openModule('Bank & Terms Settings')),
  'Quotation':()=>(typeof window.axCorporateQuotation==='function'?window.axCorporateQuotation():window.openModule('Quotation')),
  'New Quotation':()=>(typeof window.axCorporateQuotation==='function'?window.axCorporateQuotation():window.openModule('New Quotation')),
+ 'New Sales Order':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Sales Order / PO'):window.openModule('Sales Order / PO')),
  'Sales Order / PO':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Sales Order / PO'):window.openModule('Sales Order / PO')),
  'Delivery Challan':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Delivery Challan'):window.openModule('Delivery Challan')),
  'Sales Invoice':()=>(typeof window.axDetailedDocument==='function'?window.axDetailedDocument('Sales Invoice'):window.openModule('Sales Invoice')),
