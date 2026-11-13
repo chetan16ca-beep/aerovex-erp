@@ -35,5 +35,5 @@ window.axFromSalesOrder=function(i,target){
  if(target==='invoice'&&typeof postV==='function')postV('Sales',no,doc.date,doc.party,doc.total,0,doc.remarks);
  db[dest].push(doc);save();axDocPreview(target==='challan'?'Delivery Challan':'Sales Invoice',db[dest].length-1);
 };
-const prev=openModule;openModule=function(name){if(types[name])return axDetailedDocument(name);return prev(name)};
+const prev=openModule;openModule=function(name){if(name==='New Sales Order')return axDetailedDocument('Sales Order / PO');if(types[name])return axDetailedDocument(name);return prev(name)};
 })();
