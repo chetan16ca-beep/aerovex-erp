@@ -1,7 +1,7 @@
-name: Deploy Aerovex ERP to GitHub Pages
+# GitHub Pages native branch build handles automatic deployments on main.
+# Keep this only as an explicit manual fallback to prevent concurrent Pages deploys.
+name: Manual Aerovex Pages Deploy (fallback)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
