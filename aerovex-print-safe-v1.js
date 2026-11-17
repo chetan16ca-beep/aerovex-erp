@@ -48,7 +48,8 @@ function preview(html,title,landscape){
  'min-height:0!important;max-height:none!important;z-index:auto!important;'+
  'padding:0!important;margin:0!important;overflow:visible!important;'+
  'background:white!important;box-shadow:none!important}'+
- '#axSafePrintToolbar{display:none!important}'+
+ '#axSafePrintRoot,#axSafePrintRoot *{visibility:visible!important}'+
+ '#axSafePrintToolbar,#axSafePrintToolbar *{visibility:hidden!important;display:none!important}'+
  '#axSafePrintPaper{position:static!important;display:block!important;'+
  'box-sizing:border-box!important;width:100%!important;max-width:none!important;'+
  'min-width:0!important;height:auto!important;max-height:none!important;'+
