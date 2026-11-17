@@ -13,6 +13,7 @@ function allocations(order,index){
  if(!id(order))errors.push('Sales Order number is missing.');
  if(!used.length)errors.push('No product lines saved in this Sales Order.');
  works().forEach(w=>{
+  if(w.isDeleted||w.status==='Deleted')return;
   if(w.sourceSalesOrder? w.sourceSalesOrder!==id(order):w.sourceSalesOrderIndex!==index)return;
   const n=w.sourceLine??w.sourceSalesOrderLine;
   if(!Number.isInteger(n)||n<0||n>=used.length){errors.push('Existing linked Work Order '+w.workNo+' has no reliable product line.');return}
@@ -48,7 +49,7 @@ function draw(){
  root.innerHTML=data.errors.map(x=>'<p style="color:#b42318">'+esc(x)+'</p>').join('')+
  data.rows.map(r=>'<section style="margin:10px 0;padding:12px;border:1px solid #cddde7;border-radius:10px"><label><input type="checkbox" class="axSOSelectItem" data-line="'+r.i+'" '+(r.left>0&&!data.errors.length?'checked':'disabled')+'> <b>'+esc(r.item.description||'Product '+(r.i+1))+'</b></label><p>Size '+esc(r.item.size||'')+' | SO Qty '+r.total+' | WO Qty '+r.used+' | Pending '+Math.max(0,r.left)+'</p>'+(r.left>0&&!data.errors.length?'<label>WO Qty<input type="number" class="axSOQty" data-line="'+r.i+'" min="0.001" max="'+r.left+'" step="any" value="'+r.left+'"></label>':'')+'</section>').join('')+
  (data.rows.some(r=>r.left>0)&&!data.errors.length?'<label>Priority<select id="axSOWOPriority"><option>Normal</option><option>Urgent</option></select></label><p><button class="primary" id="axSOWOSave" type="button">Create Individual Work Orders</button></p>':'')+
- '<p>Linked Works: '+works().filter(w=>w.sourceSalesOrder===id(order)).map(w=>esc(w.workNo)).join(' • ')+'</p>';
+ '<p>Linked Works: '+works().filter(w=>!w.isDeleted&&w.status!=='Deleted'&&w.sourceSalesOrder===id(order)).map(w=>esc(w.workNo)).join(' • ')+'</p>';
  document.getElementById('axSOWOSave')?.addEventListener('click',create);
 }
 function create(){
