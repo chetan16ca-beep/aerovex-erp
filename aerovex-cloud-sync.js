@@ -189,7 +189,7 @@ function mergeData(before,ours,theirs){
       for(const x of [...addedCloud,...addedMine]){
         const identity=id(k,x),prior=ids.get(identity);
         if(prior){
-          if((k==='parties'||k==='suppliers')&&!prior.original&&stable(prior.record)===stable(x))continue;
+          if((k==='parties'||k==='suppliers'||k==='salesOrders')&&!prior.original&&stable(prior.record)===stable(x))continue;
           throw Error(k+': duplicate or conflicting entry ID on both devices');
         }
         ids.set(identity,{record:x,original:false});
