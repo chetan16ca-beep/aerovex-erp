@@ -35,8 +35,13 @@ function itemTable(x,hideCommercial=false){
   // Line values are derived only for display, while grand total uses saved ERP fields.
   const base=amount(z.taxable??z.amount);
   const line=base!==null?money(base):q!==null&&r!==null?money(q*r*(1-d/100)):'Not recorded';
-  return '<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td><b>'+esc(get(z,'description','name')||'Description not recorded')+'</b>'+
-  '<small>'+[['AFX CODE',window.axAFXCodeMaster?.resolve?.(z)?.code||z.productCode],['ITEM NO',z.itemNo||window.axAFXCodeMaster?.resolve?.(z)?.itemNo],['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
+  // Full AFX product code is the primary heading. Specs stay in Description.
+  const heading=window.axAFXCodeMaster?.resolve?.(z)?.code||get(z,'productCode');
+  const description=get(z,'description','name')||'Description not recorded';
+  return '<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td>'+
+  '<strong class="axSAPProductHeading" style="display:block;font-size:13px;color:#0b4961">'+esc(heading||description)+'</strong>'+
+  (heading?'<div style="margin-top:5px"><b>Description:</b> '+esc(description)+'</div>':'')+
+  '<small>'+[['ITEM NO',z.itemNo||window.axAFXCodeMaster?.resolve?.(z)?.itemNo],['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
   '<td>'+esc(get(z,'hsn')||get(x,'hsn')||'—')+'</td><td>'+esc(z.qty??'—')+'</td><td>'+esc(get(z,'unit')||get(x,'unit')||'—')+'</td>'+
   (hideCommercial?'':'<td>'+numberFormat(z.rate)+'</td><td>'+line+'</td>')+'</tr>';
  }).join('');
