@@ -126,6 +126,69 @@ const css=document.createElement('style');
 css.textContent='.axCustomerPicker{display:block;padding:8px;border:1px solid #c7dfe5;background:#eff8fb;border-radius:10px;color:#124d61;font-weight:700}.axCustomerPicker select{display:block;width:100%;margin-top:8px;min-height:42px}.axCustomerRow{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dde7ed;background:white;border-radius:9px;padding:10px;margin:7px 0;flex-wrap:wrap}.axCustomerRow small{color:#556f80;display:block}.axCustomerMasterTools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}';
 document.head.append(css);
 let editing=null;
+/* Safe cloud-to-device Customer Master import.
+   Authenticated owner only. Append missing customers, fill blank fields,
+   never delete or replace existing local records or ERP modules. */
+let axCloudCustomerImportBusy=false;
+async function axImportCloudCustomers(manual=false){
+ if(axCloudCustomerImportBusy)return;
+ const currentStatus=()=>document.getElementById('axCloudCustomerStatus');
+ const report=msg=>{const x=currentStatus();if(x)x.textContent=msg};
+ let session=null;
+ try{session=JSON.parse(sessionStorage.getItem('ax-erp-owner-session-v1')||'null')}catch(e){}
+ if(!session?.access_token){if(manual)report('Please log in as Aerovex owner, then retry. Local customers unchanged.');return}
+ axCloudCustomerImportBusy=true;
+ report('Checking saved cloud customers securely…');
+ try{
+  const root='https://gfdqzyhhpbhvubpwdxdi.supabase.co';
+  const key='sb_publishable_EXF3rH1gM0bMF6yhGWiUig_XsCa3MrM';
+  const headers={apikey:key,Authorization:'Bearer '+session.access_token,Accept:'application/json'};
+  const meResponse=await fetch(root+'/auth/v1/user',{headers,cache:'no-store'});
+  if(!meResponse.ok)throw Error('Owner session expired. Please sign in again.');
+  const me=await meResponse.json();
+  if(String(me.email||'').toLowerCase()!=='aerovexfiltration@gmail.com'||!me.id)
+   throw Error('Aerovex owner verification failed.');
+  const response=await fetch(root+'/rest/v1/erp_snapshots?select=payload&user_id=eq.'+encodeURIComponent(me.id)+'&limit=1',
+    {headers,cache:'no-store'});
+  if(!response.ok)throw Error('Cloud customer list unavailable (HTTP '+response.status+').');
+  const rows=await response.json();
+  const imported=rows?.[0]?.payload?.parties;
+  if(!Array.isArray(imported))throw Error('Cloud customer list unavailable. Nothing was changed.');
+  if(!Array.isArray(db.parties))throw Error('Local Customer Master format is not valid. Nothing was changed.');
+  const before=JSON.stringify(db.parties);
+  let added=0,filled=0,conflicts=0;
+  for(const source of imported){
+   if(!source||typeof source!=='object'||Array.isArray(source))continue;
+   const c=customer(source);
+   if(!c.name)continue;
+   const i=find(c);
+   if(i>=0){
+    const existing=customer(db.parties[i]);
+    if(existing.gstin&&c.gstin&&norm(existing.gstin)!==norm(c.gstin)){
+     conflicts++;continue;
+    }
+    if(mergeBlank(db.parties[i],c))filled++;
+   }else{db.parties.push({...source,name:c.name,party:c.name,f0:c.name,gstin:c.gstin,f1:c.gstin,
+     phone:c.phone,f2:c.phone,email:c.email,f3:c.email});added++}
+  }
+  if(added||filled){
+   try{save()}catch(e){
+    db.parties=JSON.parse(before);
+    throw Error('Phone storage could not save imported customers. Original customer list restored.');
+   }
+  }
+  const summary=(added||filled?'✓ '+added+' new cloud customer(s) imported, '+filled+' completed.':'✓ Customer Master already matches cloud.')+
+    (conflicts?' '+conflicts+' conflicting record(s) skipped safely.':'');
+  if(document.getElementById('axCustomerMasterForm')){
+   const q=document.getElementById('axCustomerSearch')?.value||'';
+   const form=document.getElementById('axCustomerMasterForm');
+   const isDirty=Array.from(form?.elements||[]).some(el=>['INPUT','TEXTAREA'].includes(el.tagName)&&clean(el.value));
+   if(!isDirty)master(q);
+  }
+  report(summary);
+ }catch(e){report('Cloud import not completed: '+e.message+' Local records preserved.')}
+ finally{axCloudCustomerImportBusy=false}
+}
 function master(searchTerm=''){
  const records=list(),matches=records.filter(x=>!searchTerm||[x.name,x.gstin,x.phone,x.address].join(' ').toLowerCase().includes(searchTerm.toLowerCase()));
  show('Customer Master','<p>Customer details save once, then choose from Quotation, Sales Order, Delivery Challan or Invoice. A customer is also added after its first saved bill. Existing records are not deleted.</p>'+
@@ -138,9 +201,11 @@ function master(searchTerm=''){
  '<label>Place of Supply<input name="place"></label>'+
  '<label class="full">Customer Address<textarea name="address" rows="3"></textarea></label>'+
  '<div class="full"><button class="primary" type="submit" id="axCustomerSave">Save Customer</button><button type="button" id="axCustomerClear">New / Clear</button></div></form>'+
+ '<div class="axCustomerMasterTools"><button type="button" id="axCloudCustomerImport">↻ Import Missing Cloud Customers</button></div><p id="axCloudCustomerStatus" role="status" aria-live="polite"></p>'+ 
  '<h3>Saved Customers ('+records.length+')</h3>'+
  '<label>Search Customer<input id="axCustomerSearch" type="search" placeholder="Name, GSTIN or mobile" value="'+E(searchTerm)+'"></label>'+
  '<div id="axCustomerResults">'+matches.map(x=>'<div class="axCustomerRow"><div><b>'+E(x.name)+'</b><small>'+E(x.gstin)+' '+E(x.phone)+'</small><small>'+E(x.address)+'</small></div><button type="button" data-edit="'+x.i+'">Edit</button></div>').join('')+'</div>');
+ document.getElementById('axCloudCustomerImport').onclick=()=>axImportCloudCustomers(true);
  const form=document.getElementById('axCustomerMasterForm');
  form.onsubmit=event=>{
   event.preventDefault();
@@ -169,7 +234,7 @@ function master(searchTerm=''){
   form.scrollIntoView({block:'start',behavior:'smooth'});
  };
 }
-window.axCustomerMaster=()=>{editing=null;master()};
+window.axCustomerMaster=()=>{editing=null;master();axImportCloudCustomers(false)};
 window.axCustomerSyncBills=syncBills;
 const prior=window.openModule;
 window.openModule=function(name){if(name==='Customer Master'||name==='Party Master')return window.axCustomerMaster();return prior.apply(this,arguments)};
