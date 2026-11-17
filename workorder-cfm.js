@@ -4,6 +4,65 @@ const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const num=v=>Math.max(0,Number(v)||0);
 const items=w=>Array.isArray(w.items)&&w.items.length?w.items:[{description:w.description||w.product||'',size:w.size||'',cloth:w.cloth||'',width:w.width||'',srl:w.srl||'',qty:num(w.qty),cutQty:num(w.done)}];
 const pending=x=>Math.max(0,num(x.qty)-num(x.cutQty));
+const isDeleted=w=>!!(w&&(w.isDeleted===true||w.deleted===true||String(w.status||'').toLowerCase()==='deleted'));
+const ACTIVE_MODULES=['cutting','departmentWork','packing','dispatch','dispatches','qc','qualityChecks','invoices','challans'];
+function woLinks(w){
+ const id=String(w.workNo||'').trim().toUpperCase();
+ const fields=['workNo','workOrder','workOrderNo','sourceWorkOrder','sourceWorkNo','refWorkOrder','linkedWorkOrder'];
+ const found=[];
+ for(const key of ACTIVE_MODULES){
+  const list=Array.isArray(db[key])?db[key]:[];
+  const count=list.filter(row=>row&&fields.some(f=>String(row[f]||'').trim().toUpperCase()===id)).length;
+  if(count)found.push(key+': '+count+' linked entries');
+ }
+ return found;
+}
+function woDeletionBlockers(w){
+ const reasons=woLinks(w);
+ if(items(w).some(x=>num(x.cutQty)>0||num(x.doneQty)>0))reasons.push('Cutting/production quantity recorded');
+ if(num(w.done)>0)reasons.push('Work Order Done quantity recorded');
+ if(Object.values(w.workflowChecks||{}).some(Boolean))reasons.push('Production-stage completion already ticked');
+ if(Object.values(w.workflowStageDates||{}).some(Boolean))reasons.push('Production-stage dates recorded');
+ return reasons;
+}
+async function persistWOChange(index,previous,message){
+ try{
+  save();
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  render();listing();
+  alert(message+' Saved on THIS DEVICE. Keep the ERP online until Cloud Sync confirms the update.');
+ }catch(error){
+  db.workOrders[index]=previous;
+  try{save();if(window.axERPStorageBridge)await window.axERPStorageBridge.flush()}catch(ignore){}
+  render();listing();
+  alert('Work Order change NOT VERIFIED: '+String(error?.message||error)+'. Previous record restored on this device; verify Cloud Sync before retrying.');
+ }
+}
+window.axWODelete=async function(index){
+ const w=db.workOrders?.[index];
+ if(!w||isDeleted(w))return alert('Work Order unavailable or already deleted.');
+ const blockers=woDeletionBlockers(w);
+ if(blockers.length)return alert('DELETE BLOCKED: '+w.workNo+' has linked activity. '+blockers.join('; ')+'. No records changed. Correct these entries through the appropriate department; do not delete a started Work Order.');
+ if(!confirm('DELETE '+w.workNo+' — '+String(w.party||'')+'?\\nIt will disappear from Active Work Orders, but remain in Deleted Work Orders for Restore and audit. No stock, Sales Order, Invoice or other records will be deleted.'))return;
+ const reason=prompt('Reason for deleting '+w.workNo+' (required):','Created by mistake');
+ if(reason===null)return;
+ if(!String(reason).trim())return alert('Deletion cancelled: reason is required.');
+ const prior=JSON.parse(JSON.stringify(w));
+ db.workOrders[index]={...w,isDeleted:true,status:'Deleted',deletedAt:new Date().toISOString(),deleteReason:String(reason).trim(),statusBeforeDelete:w.status||'Open'};
+ await persistWOChange(index,prior,'✓ '+w.workNo+' moved to Deleted Work Orders. Number reserved.');
+};
+window.axWORestore=async function(index){
+ const w=db.workOrders?.[index];
+ if(!w||!isDeleted(w))return alert('Deleted Work Order not found.');
+ const dup=(db.workOrders||[]).some((x,i)=>i!==index&&!isDeleted(x)&&String(x.workNo||'').trim().toUpperCase()===String(w.workNo||'').trim().toUpperCase());
+ if(dup)return alert('Restore blocked: an active Work Order already uses '+w.workNo+'.');
+ if(!confirm('RESTORE '+w.workNo+' into Active Work Orders? No stock or department entries will be created.'))return;
+ const previous=JSON.parse(JSON.stringify(w));
+ const restored={...w,isDeleted:false,status:w.statusBeforeDelete||'Open',restoredAt:new Date().toISOString()};
+ delete restored.deletedAt;delete restored.deleteReason;delete restored.statusBeforeDelete;
+ db.workOrders[index]=restored;
+ await persistWOChange(index,previous,'✓ '+w.workNo+' restored.');
+};
 const stages=[['cuttingDone','Cutting Done'],['stitchDone','Stitch Done'],['packingDone','Packing Done'],['deliveryDone','Delivery Done']];
 const cutRows=w=>{
  const no=String(w?.workNo||w?.orderNo||'').trim().toUpperCase();
@@ -22,7 +81,7 @@ const stageBoxes=(index,w)=>{
 };
 window.axWOStageChanged=(index,key,input)=>{
  if(!stages.some(x=>x[0]===key))return;
- const w=db.workOrders?.[index];if(!w)return;
+ const w=db.workOrders?.[index];if(!w||isDeleted(w)){input.checked=false;return alert('Deleted Work Order cannot record stage progress.')} 
  const checked=!!input.checked,prior={...(w.workflowChecks||{})},dates={...(w.workflowStageDates||{})};
  if(checked&&key==='cuttingDone'){
   const due=items(w).reduce((sum,x)=>sum+pending(x),0);
@@ -51,7 +110,7 @@ function line(x={}){
  ['cloth','width'].forEach(k=>box.querySelector('[data-k='+k+']').addEventListener('input',refresh));document.getElementById('axWOLines').appendChild(box);refresh();
 }
 function editor(index){
- const existing=index==null?null:db.workOrders[index];const w=existing||{};
+ const existing=index==null?null:db.workOrders[index];if(existing&&isDeleted(existing))return alert('This Work Order is deleted. Restore it before editing.');const w=existing||{};
  show(existing?'Edit Work Order':'New Work Order — CFM Layout','<form id="axWOForm"><div class="axWOGrid"><label>Work No<input name="workNo" required '+(existing?'readonly':'')+' value="'+E(w.workNo||nextWO())+'"></label><label>Party<input name="party" required value="'+E(w.party||'')+'"></label><label>PO / Reference<input name="po" value="'+E(w.po||'')+'"></label><label>Date<input name="date" type="date" value="'+E(w.date||new Date().toISOString().slice(0,10))+'"></label><label>Priority<select name="priority"><option '+(w.priority==='Normal'?'selected':'')+'>Normal</option><option '+(w.priority==='Urgent'?'selected':'')+'>Urgent</option></select></label><label>Remarks<input name="remark" value="'+E(w.remark||'')+'"></label></div><h3>Items / Cloth / SRL</h3><div id="axWOLines"></div><div class="axWOActions"><button type="button" id="axWOAdd">+ Add Item</button><button class="primary">Save Work Order</button><button type="button" id="axWOBack">Pending Orders</button></div></form>');
  const existingLines=existing?items(existing):[{}];existingLines.forEach(line);
  if(existing){
@@ -69,14 +128,19 @@ function editor(index){
  };
 }
 function listing(){
- const entries=db.workOrders.map((w,i)=>({w,i}));const total=entries.reduce((n,{w})=>n+items(w).reduce((a,x)=>a+pending(x),0),0);
- show('Work Orders • Actual Cloth / SRL • Progress','<div class="axWOActions"><button class="primary" id="axNewWO">+ New Work Order</button><button id="axPrintPending">Print Pending Only</button><button id="axShowAll">Show Pending Cutting Only</button></div><p><b>'+entries.length+'</b> Work Orders • <b class="axWOPending">'+total+'</b> Pending Qty</p><label style="display:block;margin:10px 0 14px">Search Work No., Party, Cloth or SRL<input id="axWOFind" type="search" placeholder="e.g. AFX-WO-0001 / E-251" style="width:100%;margin-top:6px"></label><div id="axWOResults"></div>');
- document.getElementById('axNewWO').onclick=()=>editor();let all=true,shown=30;document.getElementById('axShowAll').onclick=()=>{all=!all;shown=30;document.getElementById('axShowAll').textContent=all?'Show Pending Cutting Only':'Show All Work Orders';draw()};document.getElementById('axPrintPending').onclick=printPending;document.getElementById('axWOFind').oninput=()=>{shown=30;draw()};
+ const allEntries=db.workOrders.map((w,i)=>({w,i})),entries=allEntries.filter(({w})=>!isDeleted(w));const total=entries.reduce((n,{w})=>n+items(w).reduce((a,x)=>a+pending(x),0),0);
+ show('Work Orders • Actual Cloth / SRL • Progress','<div class="axWOActions"><button class="primary" id="axNewWO">+ New Work Order</button><button id="axPrintPending">Print Pending Only</button><button id="axShowAll">Show Pending Cutting Only</button><button id="axWOShowDeleted">Deleted Work Orders / Restore</button></div><p><b>'+entries.length+'</b> Work Orders • <b class="axWOPending">'+total+'</b> Pending Qty</p><label style="display:block;margin:10px 0 14px">Search Work No., Party, Cloth or SRL<input id="axWOFind" type="search" placeholder="e.g. AFX-WO-0001 / E-251" style="width:100%;margin-top:6px"></label><div id="axWOResults"></div>');
+ document.getElementById('axNewWO').onclick=()=>editor();let all=true,shown=30;document.getElementById('axShowAll').onclick=()=>{all=!all;shown=30;document.getElementById('axShowAll').textContent=all?'Show Pending Cutting Only':'Show All Work Orders';draw()};document.getElementById('axPrintPending').onclick=printPending;document.getElementById('axWOFind').oninput=()=>{shown=30;draw()};document.getElementById('axWOShowDeleted').onclick=()=>{
+ const deleted=allEntries.filter(({w})=>isDeleted(w));
+ show('Deleted Work Orders — Restore / Audit','<p>These Work Orders were manually removed from active production. They are retained for audit and can be restored. No stock or connected records were erased.</p><button type="button" id="axWOActiveBack">Back to Active Work Orders</button><div id="axWODeletedRows">'+
+ (deleted.map(({w,i})=>'<section class="axWOCard"><strong>'+E(w.workNo)+' — '+E(w.party)+'</strong><p>Deleted: '+E(w.deletedAt||'—')+'<br>Reason: '+E(w.deleteReason||'—')+'</p><button type="button" onclick="axWORestore('+i+')">Restore Work Order</button></section>').join('')||'<p>No deleted Work Orders.</p>')+'</div>');
+ document.getElementById('axWOActiveBack').onclick=listing;
+};
  function draw(){
  const q=String(document.getElementById('axWOFind')?.value||'').trim().toLowerCase();
  const filtered=entries.filter(({w})=>(all||items(w).some(x=>pending(x)>0))&&
  (!q||[w.workNo,w.orderNo,w.party,w.description,...items(w).flatMap(x=>[x.description,x.productCode,x.cloth,x.srl,x.size]),...cutRows(w).flatMap(x=>[x.srl,x.cloth])].join(' ').toLowerCase().includes(q)));
- document.getElementById('axWOResults').innerHTML=filtered.slice(0,shown).map(({w,i})=>'<section class="axWOCard"><h3>'+E(w.workNo||w.orderNo||'#'+(i+1))+' — '+E(w.party)+'</h3><div class="axWOActions"><button onclick="axWOEdit('+i+')">Edit</button><span>'+E(w.priority||'Normal')+'</span></div><div class="axWOTableWrap"><table class="axWOTable"><thead><tr><th>Product / Size</th><th>Cloth</th><th>Width</th><th>SRL</th><th>Order</th><th>Cut</th><th>Pending</th><th>Action</th></tr></thead><tbody>'+items(w).map((x,j)=>'<tr><td>'+E(x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||'')+'<br>'+E(x.description)+'<br><small>'+E(x.size)+'</small></td><td>'+E(x.cloth)+'</td><td>'+E(x.width)+'</td><td>'+E(x.srl)+'</td><td>'+num(x.qty)+'</td><td>'+num(x.cutQty)+'</td><td class="axWOPending">'+pending(x)+'</td><td>'+(pending(x)?'<button onclick="axWOCut('+i+','+j+')">Cut Entry</button>':'Done')+'</td></tr>').join('')+'</tbody></table></div>'+actualCutting(w)+stageBoxes(i,w)+'</section>').join('')||'<p>No work orders matching this filter.</p>';
+ document.getElementById('axWOResults').innerHTML=filtered.slice(0,shown).map(({w,i})=>'<section class="axWOCard"><h3>'+E(w.workNo||w.orderNo||'#'+(i+1))+' — '+E(w.party)+'</h3><div class="axWOActions"><button onclick="axWOEdit('+i+')">Edit</button><button type="button" style="color:#ad2637" onclick="axWODelete('+i+')">Delete</button><span>'+E(w.priority||'Normal')+'</span></div><div class="axWOTableWrap"><table class="axWOTable"><thead><tr><th>Product / Size</th><th>Cloth</th><th>Width</th><th>SRL</th><th>Order</th><th>Cut</th><th>Pending</th><th>Action</th></tr></thead><tbody>'+items(w).map((x,j)=>'<tr><td>'+E(x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||'')+'<br>'+E(x.description)+'<br><small>'+E(x.size)+'</small></td><td>'+E(x.cloth)+'</td><td>'+E(x.width)+'</td><td>'+E(x.srl)+'</td><td>'+num(x.qty)+'</td><td>'+num(x.cutQty)+'</td><td class="axWOPending">'+pending(x)+'</td><td>'+(pending(x)?'<button onclick="axWOCut('+i+','+j+')">Cut Entry</button>':'Done')+'</td></tr>').join('')+'</tbody></table></div>'+actualCutting(w)+stageBoxes(i,w)+'</section>').join('')||'<p>No work orders matching this filter.</p>';
  if(filtered.length>shown){
   const result=document.getElementById('axWOResults');
   result.insertAdjacentHTML('beforeend','<button type="button" id="axWOMore">Show Next 30 Work Orders ('+(filtered.length-shown)+' more)</button>');
@@ -87,7 +151,7 @@ function listing(){
 }
 window.axWOOverview=listing;
 window.axWOEdit=editor;
-window.axWOCut=(i,j)=>{const w=db.workOrders[i],x=items(w)[j];if(!w||!x)return;const left=pending(x);if(!left)return alert('Cutting complete');
+window.axWOCut=(i,j)=>{const w=db.workOrders[i];if(!w||isDeleted(w))return alert('Cannot cut a deleted Work Order. Restore first.');const x=items(w)[j];if(!x)return;const left=pending(x);if(!left)return alert('Cutting complete');
  const q=prompt('Cut Qty (Pending '+left+')',String(left));if(q===null)return;const qty=Number(q);if(!Number.isInteger(qty)||qty<1||qty>left)return alert('Invalid cutting quantity');
  const serials=openSerials(x.cloth,x.width);const srl=prompt('Actual SRL'+(serials.length?' — Active: '+serials.map(a=>a.serial).join(', '):''),x.srl||'');if(srl===null)return;
  if(!String(srl).trim())return alert('Enter actual SRL for traceability.');
@@ -113,6 +177,6 @@ window.axWOCut=(i,j)=>{const w=db.workOrders[i],x=items(w)[j];if(!w||!x)return;c
  db.cutting.push({workNo:w.workNo,productCode:x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||'',itemNo:x.itemNo||window.axAFXCodeMaster?.resolve?.(x)?.itemNo||'',description:x.description,size:x.size,cloth:actualCloth,width:actualWidth,srl:String(srl).trim(),qty,meter,date:new Date().toISOString().slice(0,10),clothSource});
  save();render();listing();
 };
-function printPending(){const rows=db.workOrders.flatMap(w=>items(w).filter(x=>pending(x)>0).map(x=>'<tr><td>'+E(w.workNo)+'</td><td>'+E(w.party)+'</td><td>'+E(x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||'')+'<br>'+E(x.description)+'</td><td>'+E(x.size)+'</td><td>'+E(x.cloth)+'</td><td>'+E(x.width)+'</td><td>'+num(x.qty)+'</td><td>'+num(x.cutQty)+'</td><td>'+pending(x)+'</td><td></td></tr>')).join('');if(!rows)return alert('No pending items');const win=window.open('','_blank');if(!win)return alert('Allow popups');win.document.write('<!doctype html><html><head><title>Pending Cutting</title><style>@page{size:A4 landscape;margin:10mm}body{font:12px Arial}table{width:100%;border-collapse:collapse}td,th{border:1px solid #777;padding:7px;text-align:left}</style></head><body><h2>AEROVEX FILTRATION — DAILY PENDING CUTTING</h2><table><tr><th>Work No</th><th>Party</th><th>Product</th><th>Size</th><th>Cloth</th><th>Width</th><th>Order</th><th>Cut</th><th>Pending</th><th>Actual SRL</th></tr>'+rows+'</table></body></html>');win.document.close();win.print()}
+function printPending(){const rows=db.workOrders.filter(w=>!isDeleted(w)).flatMap(w=>items(w).filter(x=>pending(x)>0).map(x=>'<tr><td>'+E(w.workNo)+'</td><td>'+E(w.party)+'</td><td>'+E(x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||'')+'<br>'+E(x.description)+'</td><td>'+E(x.size)+'</td><td>'+E(x.cloth)+'</td><td>'+E(x.width)+'</td><td>'+num(x.qty)+'</td><td>'+num(x.cutQty)+'</td><td>'+pending(x)+'</td><td></td></tr>')).join('');if(!rows)return alert('No pending items');const win=window.open('','_blank');if(!win)return alert('Allow popups');win.document.write('<!doctype html><html><head><title>Pending Cutting</title><style>@page{size:A4 landscape;margin:10mm}body{font:12px Arial}table{width:100%;border-collapse:collapse}td,th{border:1px solid #777;padding:7px;text-align:left}</style></head><body><h2>AEROVEX FILTRATION — DAILY PENDING CUTTING</h2><table><tr><th>Work No</th><th>Party</th><th>Product</th><th>Size</th><th>Cloth</th><th>Width</th><th>Order</th><th>Cut</th><th>Pending</th><th>Actual SRL</th></tr>'+rows+'</table></body></html>');win.document.close();win.print()}
 const old=openModule;openModule=function(name){if(name==='New Work Order')return editor();if(name==='Work Orders'||name==='Pending Orders')return listing();return old(name)};
 })();
