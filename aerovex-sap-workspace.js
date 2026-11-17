@@ -97,9 +97,15 @@ function preview(type,index){
 function print(){
  if(!active)return;
  const x=db[group(active.type)]?.[active.index];if(!x)return alert('Saved record not found.');
- const w=window.open('','_blank');if(!w)return alert('Please allow popups for Print / Save PDF.');
  const uri=new URL('aerovex-sap-documents.css?v=2',document.baseURI).href;
  const no=identifier(x,active.type,active.index);
+ // Native PDF print on Android runs within the user's click, without popups.
+ // It uses the existing SAP layout; Sales Order / Challan stay price-free.
+ if(typeof window.axPrintSafe==='function'){
+  return window.axPrintSafe({html:printBody(active.type,x,active.index),
+   title:no,cssUrl:uri,landscape:false});
+ }
+ const w=window.open('','_blank');if(!w)return alert('Please allow popups for Print / Save PDF.');
  // Open synchronously from the user click; wait only for logo conversion,
  // so the saved original logo is never overwritten and popup blockers stay off.
  const write=()=>{
