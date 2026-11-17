@@ -1,5 +1,5 @@
-/* Aerovex print / Save as PDF v2.
- * Mobile: VISIBLE A4 document preview first, explicit second-tap Print.
+/* Aerovex print / Save as PDF v3.
+ * Mobile: standalone visible document preview, explicit user-tap Print.
  * No hidden/offscreen print container or immediate Android window.print().
  * Read-only; never writes, deletes or changes ERP records or localStorage.
  */
@@ -92,30 +92,73 @@ function preview(html,title,landscape){
  if(typeof root.scrollTo==='function')root.scrollTo(0,0);
  return true;
 }
-function desktop(html,title,cssUrl,landscape){
- const w=window.open('','_blank');
+function isolated(html,title,cssUrl,landscape){
+ // Open on the real user click. Android print engines can produce an empty
+ // PDF when a fixed overlay in the full ERP page is sent to window.print().
+ // A standalone print document has no ERP modals or global print styles.
+ const w=window.open('about:blank','_blank');
  if(!w)return preview(html,title,landscape);
- const doc='<!doctype html><html><head><meta charset="utf-8">'+
+ const base=esc(document.baseURI);
+ const doc='<!doctype html><html lang="en"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width,initial-scale=1">'+
- '<title>'+esc(title)+'</title>'+
+ '<base href="'+base+'"><title>'+esc(title)+'</title>'+
  (cssUrl?'<link rel="stylesheet" href="'+esc(cssUrl)+'">':'')+
  '<style>@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:11mm}'+
- 'body{background:#fff;color:#172b3a;font-family:Arial,sans-serif}'+
- '#axPrintBar{position:sticky;top:0;background:#e9f4fa;padding:12px;z-index:4}'+
+ '*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f0f5f8;'+
+ 'color:#172b3a;font-family:Arial,sans-serif}'+
+ '#axPrintBar{position:sticky;top:0;background:#e9f4fa;padding:12px;z-index:4;'+
+ 'box-shadow:0 1px 6px #0003;display:flex;align-items:center;gap:12px;flex-wrap:wrap}'+
  '#axPrintBar button{background:#0b4961;color:white;border:0;border-radius:8px;'+
- 'padding:12px;font-weight:700;font-size:15px}'+
- '@media print{#axPrintBar{display:none!important}body{margin:0!important;padding:0!important}}'+
+ 'padding:13px 16px;font-weight:700;font-size:15px;min-height:44px}'+
+ '#axPrintBar small{font-size:12px;color:#315e73}'+
+ '#axPrintContents{background:white;max-width:'+(landscape?'1100px':'850px')+
+ ';padding:10px;margin:15px auto;min-height:300px;overflow:visible;box-shadow:0 3px 15px #0002}'+
+ '#axPrintContents .axSAPDocument,#axPrintContents .axSapRegister{'+
+ 'display:block;width:100%;min-width:0;max-width:none;margin:0 auto;overflow:visible}'+
+ '@media print{html,body{background:white!important;height:auto!important;'+
+ 'overflow:visible!important}#axPrintBar{display:none!important}'+
+ '#axPrintContents{display:block!important;max-width:none!important;'+
+ 'width:100%!important;margin:0!important;padding:0!important;'+
+ 'min-height:0!important;overflow:visible!important;box-shadow:none!important}'+
+ '#axPrintContents .axSAPDocument,#axPrintContents .axSapRegister{'+
+ 'display:block!important;min-width:0!important;max-width:none!important;'+
+ 'width:100%!important;overflow:visible!important}'+
+ '#axPrintContents .axSAPTableScroll{overflow:visible!important}'+
+ '#axPrintContents tr{break-inside:avoid}}'+
  '</style></head><body>'+
- '<div id="axPrintBar"><button onclick="window.print()">Print / Save as PDF</button>'+
- ' &nbsp; Verify the document below before printing.</div>'+html+'</body></html>';
- try{w.document.open();w.document.write(doc);w.document.close();w.focus();}
- catch(e){try{w.close()}catch(_){}return preview(html,title,landscape)}
+ '<div id="axPrintBar"><button id="axPrintNow" type="button" disabled>Print / Save as PDF</button>'+
+ '<small id="axPrintStatus">Preparing visible document preview…</small></div>'+
+ '<main id="axPrintContents">'+html+'</main></body></html>';
+ try{
+  w.document.open();w.document.write(doc);w.document.close();
+  const d=w.document,btn=d.getElementById('axPrintNow'),
+   status=d.getElementById('axPrintStatus'),body=d.getElementById('axPrintContents');
+  if(!body||!body.textContent.trim())throw Error('Document preview has no content');
+  btn.onclick=()=>{
+   if(!body.textContent.trim()){status.textContent='Empty document. Print cancelled.';return}
+   try{w.focus();w.print()}
+   catch(e){status.textContent='Print unavailable. Use browser menu > Share > Print.'}
+  };
+  const imgs=Array.from(body.querySelectorAll('img'));
+  const ready=()=>{btn.disabled=false;status.textContent='Confirm the document appears below, then Print / Save as PDF.'};
+  // Wait for company logos to render before enabling Print. A failed image
+  // must not prevent text-only invoice printing.
+  const imgsReady=Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{
+   img.addEventListener('load',resolve,{once:true});
+   img.addEventListener('error',resolve,{once:true});
+  })));
+  Promise.race([imgsReady,new Promise(resolve=>setTimeout(resolve,3500))]).then(ready,ready);
+  if(!imgs.length)ready();
+  w.focus();
+ }catch(e){
+  try{w.close()}catch(ignore){}
+  return preview(html,title,landscape);
+ }
  return true;
 }
 window.axPrintSafe=function({html,title='Aerovex Document',cssUrl='',landscape=false,forceInline=false}={}){
  if(!html||typeof html!=='string')return false;
- return forceInline||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
-  ?preview(html,title,landscape):desktop(html,title,cssUrl,landscape);
+ return forceInline?preview(html,title,landscape):isolated(html,title,cssUrl,landscape);
 };
 window.axPrintSafeInline=preview;
 window.axPrintSafeClose=close;
