@@ -181,13 +181,21 @@ function mergeData(before,ours,theirs){
       const prefixOkay=a=>a.length>=length&&originalEntries.every((v,i)=>stable(v)===stable(a[i]));
       if(!prefixOkay(mine)||!prefixOkay(cloudVal))throw Error(k+': both devices changed existing entries');
       const addedMine=mine.slice(length),addedCloud=cloudVal.slice(length);
-      const ids=new Set(originalEntries.map(x=>id(k,x)));
+      // Customer/Supplier cloud import can add the EXACT same record on both
+      // devices. Deduplicate only those identical new master entries;
+      // differing records and all other duplicate document IDs still stop sync.
+      const ids=new Map(originalEntries.map(x=>[id(k,x),{record:x,original:true}]));
+      const additions=[];
       for(const x of [...addedCloud,...addedMine]){
-        const identity=id(k,x);
-        if(ids.has(identity))throw Error(k+': duplicate document/entry ID on both devices');
-        ids.add(identity);
+        const identity=id(k,x),prior=ids.get(identity);
+        if(prior){
+          if((k==='parties'||k==='suppliers')&&!prior.original&&stable(prior.record)===stable(x))continue;
+          throw Error(k+': duplicate or conflicting entry ID on both devices');
+        }
+        ids.set(identity,{record:x,original:false});
+        additions.push(x);
       }
-      value=originalEntries.concat(addedCloud,addedMine);
+      value=originalEntries.concat(additions);
     }
     else throw Error(k+': both devices edited the same setting or record');
     if(value!==undefined)result[k]=value;
