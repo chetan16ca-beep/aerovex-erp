@@ -606,7 +606,7 @@ async function applyMobileNaksh(){
 let pendingBothWrongQuotes=null;
 function buildBothWrongQuotesMerge(mobile,remote){
  const mine=clone(mobile),cloudData=clone(remote),result=clone(remote);
- const idFor=k=>k==='quotations'?'quotationNo':k==='parties'?'gstin':k==='commissionAgents'?'id':k==='workOrders'?'workNo':'documentNo';
+ const idFor=k=>k==='quotations'?'quotationNo':k==='parties'?'gstin':k==='commissionAgents'?'id':k==='products'?'name':k==='workOrders'?'workNo':'documentNo';
  function asMap(data,k){
   const xs=Array.isArray(data[k])?data[k]:[];
   const f=idFor(k),out=new Map();
