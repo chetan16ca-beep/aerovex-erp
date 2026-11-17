@@ -130,11 +130,62 @@ async function upload(number){
   showState('⚠ PHONE SAVED / CLOUD NOT VERIFIED — '+number+'. '+(e?.message||e)+'. Do not create another order.','warning',number);
  }finally{uploading=false}
 }
+async function inspectOrders(node){
+ node.textContent='Checking saved phone Sales Orders against Aerovex Cloud…';
+ try{
+  const raw=JSON.parse(localStorage.getItem(DATA)||'{}');
+  const phone=Array.isArray(raw?.salesOrders)?raw.salesOrders:[];
+  const ctx=await authorized();
+  const cloud=await readCloud(ctx);
+  node.textContent='';
+  const heading=document.createElement('strong');
+  heading.textContent='Phone: '+phone.length+' Sales Order(s) | Cloud: '+cloud.payload.salesOrders.length+' Sales Order(s)';
+  node.appendChild(heading);
+  if(!phone.length)return;
+  let pending=0,conflicts=0,verified=0;
+  for(const item of phone){
+   const no=getNo(item);
+   if(!no)continue;
+   const found=cloud.payload.salesOrders.find(x=>getNo(x)===no);
+   if(found&&equalDocs(found,item)){verified++;continue}
+   if(found){conflicts++;const p=document.createElement('p');p.textContent='⚠ '+no+' has different details on phone and cloud. Not overwritten.';node.appendChild(p);continue}
+   pending++;
+   const row=document.createElement('div');
+   row.style.cssText='padding:8px 0;border-bottom:1px solid #ccd9e0';
+   const name=document.createElement('span');
+   name.textContent='Pending cloud: '+no+' — '+text(item.party);
+   const button=document.createElement('button');
+   button.type='button';
+   button.textContent='Upload / Verify '+no;
+   button.style.cssText='margin:5px 0 0 10px';
+   button.onclick=()=>upload(no);
+   row.append(name,button);
+   node.appendChild(row);
+  }
+  const summary=document.createElement('p');
+  summary.textContent=verified+' already verified, '+pending+' pending, '+conflicts+' conflicting. No records automatically deleted or overwritten.';
+  node.appendChild(summary);
+ }catch(e){
+  node.textContent='⚠ Could not compare orders: '+text(e?.message||e)+'. Local ERP data unchanged.';
+ }
+}
 function bind(form){
  if(form?.id!=='axDocForm'||form.dataset.axSOCSbound==='1')return;
  const h=document.querySelector('#modalBody > h2');
  if(!h||text(h.textContent).toUpperCase()!=='SALES ORDER')return;
  form.dataset.axSOCSbound='1';
+ const audit=document.createElement('div');
+ audit.className='axSOCloudAudit';
+ audit.style.cssText='padding:10px;margin:9px 0;background:#f6fafc;border:1px solid #c7dbe3;border-radius:9px';
+ const auditButton=document.createElement('button');
+ auditButton.type='button';
+ auditButton.textContent='☁ Check Saved Sales Orders (Phone vs Cloud)';
+ const auditResult=document.createElement('div');
+ auditResult.setAttribute('role','status');
+ auditResult.style.cssText='font-size:12px;margin:5px 0';
+ auditButton.onclick=()=>inspectOrders(auditResult);
+ audit.append(auditButton,auditResult);
+ form.prepend(audit);
  // Wrap the existing synchronous Sales Order save after all document
  // modules have bound it. Check that a new document really reached localStorage
  // before starting the separately verified cloud upload.
