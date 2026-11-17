@@ -11,6 +11,7 @@ const KEY='sb_publishable_EXF3rH1gM0bMF6yhGWiUig_XsCa3MrM';
 const OWNER='aerovexfiltration@gmail.com';
 const LOCAL='aerovex-erp-data-v1',SESSION='aerovex-2device-session-v3',DEVICE='aerovex-2device-role-v3';
 const INTERVAL=8000;
+const MOBILE_READ_ONLY=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 let session=null, baseline=null, stamp=null, timer=null, busy=false, paused=false, online=false, lastMessage='Not connected';
 const $=id=>document.getElementById(id);
 const stable=v=>JSON.stringify(normalize(v));
@@ -264,6 +265,8 @@ async function resume(){
  }catch(e){status('Cloud is unreachable: '+e.message)}
 }
 async function tick(){
+ // Mobile must never auto-upload or overwrite cloud/phone from legacy sync.
+ if(MOBILE_READ_ONLY)return;
  if(busy||!online||paused||!session||!stamp||document.hidden||isLocked())return;
  busy=true;
  try{
@@ -325,6 +328,8 @@ function panel(){
  status(lastMessage);
 }
 function init(){
+ // Phone uses the separate authenticated Cloud Viewer; no pairing or editing.
+ if(MOBILE_READ_ONLY)return;
  if($('axCloudButton'))return;
  const b=document.createElement('button');b.id='axCloudButton';b.textContent='☁ Cloud Sync';b.style.cssText='position:fixed;bottom:12px;right:12px;z-index:9998;padding:12px;border-radius:20px;background:#0b4961;color:white';
  b.onclick=panel;document.body.appendChild(b);
