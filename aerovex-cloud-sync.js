@@ -297,6 +297,150 @@ async function initial(){
     status('✓ Mobile source uploaded safely. PC can now join. Auto Sync checks every 8 seconds while open.');
   }catch(e){stop('Mobile initialization failed: '+e.message)}
 }
+
+/* NAKSH AFX/INV/003 vs existing PRAGNA voucher 003:
+ * A user-confirmed, two-phase reconciliation. All local and cloud records
+ * are included in ONE safety bundle before any change; no generic overwrite.
+ */
+let pendingNakshRepair=null;
+const clone=v=>JSON.parse(JSON.stringify(v));
+const partyNaksh=v=>String(v?.party||'').trim().toUpperCase()==='NAKSH ENTERPRISE';
+const docNumber=v=>String(v?.documentNo||v?.invoiceNo||'').trim();
+function unique(rows,predicate,label){
+ const matches=(Array.isArray(rows)?rows:[]).filter(predicate);
+ if(matches.length!==1)throw Error(label+': expected exactly one record; found '+matches.length);
+ return matches[0];
+}
+function orderForComparison(order){
+ const x=clone(order);
+ delete x.delivery;delete x.shipToAddress;
+ if(!Array.isArray(x.items)||x.items.length!==1)throw Error('NAKSH order line count changed. Manual review required.');
+ delete x.items[0].moc;delete x.items[0].size;
+ return x;
+}
+function buildNakshRepair(localBefore,cloudBefore){
+ const mine=clone(localBefore),theirs=clone(cloudBefore);
+ const OLD='AFX/INV/003',NEW='AFX/INV/004';
+ const inv=unique(mine.invoices,x=>docNumber(x)===OLD&&partyNaksh(x),'Local NAKSH Invoice 003');
+ if(inv.sourceChallan!=='AFX/DC/004'||Number(inv.total)!==13765.5||
+    String(inv.gstin||'')!=='24AAUFN6527B1Z7')
+  throw Error('NAKSH Invoice details changed. Safe repair requires manual review.');
+ unique(mine.challans,x=>x.documentNo==='AFX/DC/004'&&partyNaksh(x),'Local NAKSH Challan 004');
+ unique(mine.workOrders,x=>x.workNo==='AFX-WO-0008'&&partyNaksh(x),'Local NAKSH Work Order 0008');
+ const voucher=unique(mine.vouchers,x=>x.no===OLD&&x.type==='Sales'&&partyNaksh(x),'Local NAKSH Sales Voucher 003');
+ if(Number(voucher.debit)!==13765.5)throw Error('NAKSH Voucher amount mismatch. No data changed.');
+ const pragna=unique(theirs.vouchers,x=>x.no===OLD&&x.type==='Sales'&&
+   String(x.party||'').toLowerCase().includes('pragna'),'Existing Cloud Pragna Sales Voucher 003');
+ if(Number(pragna.debit)!==4720)throw Error('Cloud Pragna Voucher differs. Manual review required.');
+ if([mine,theirs].some(o=>(o.invoices||[]).some(x=>docNumber(x)===NEW)||
+    (o.vouchers||[]).some(x=>x.no===NEW&&x.type==='Sales')))
+  throw Error('Invoice 004 already exists. No automatic renumber is permitted.');
+ if((theirs.invoices||[]).some(x=>partyNaksh(x)))
+  throw Error('NAKSH Invoice already present in Cloud. No duplicate upload allowed.');
+ if((theirs.challans||[]).some(x=>x.documentNo==='AFX/DC/004')||
+    (theirs.workOrders||[]).some(x=>x.workNo==='AFX-WO-0008'))
+  throw Error('Cloud already includes NAKSH production or challan records. Verify before merging.');
+ const localSO=unique(mine.salesOrders,x=>x.documentNo==='AFX/SO/004'&&partyNaksh(x),'Laptop NAKSH SO 004');
+ const cloudSO=unique(theirs.salesOrders,x=>x.documentNo==='AFX/SO/004'&&partyNaksh(x),'Cloud NAKSH SO 004');
+ if(stable(orderForComparison(localSO))!==stable(orderForComparison(cloudSO)))
+  throw Error('NAKSH SO has unexpected differences beyond approved Delivery, Ship To, MOC, and Size. Manual review required.');
+ if(Number(localSO.total)!==13765.5||Number(cloudSO.total)!==13765.5)
+  throw Error('Sales Order totals differ. Nothing changed.');
+ // Only confirmed spelling/specification fields differ. PC values have
+ // complete MOC, size, ship-to and delivery details; preserve those exact values.
+ theirs.salesOrders[theirs.salesOrders.findIndex(x=>x.documentNo==='AFX/SO/004')]=clone(localSO);
+ inv.documentNo=NEW;inv.invoiceNo=NEW;
+ voucher.no=NEW; // Do NOT change the old Pragna 003 voucher.
+ const merged=firstJoinMerge(mine,theirs);
+ const invoices=(merged.invoices||[]).filter(x=>docNumber(x)===NEW&&partyNaksh(x));
+ const preservedPragna=(merged.vouchers||[]).filter(x=>x.no===OLD&&x.type==='Sales'&&
+   String(x.party||'').toLowerCase().includes('pragna'));
+ if(invoices.length!==1||preservedPragna.length!==1||
+    !(merged.vouchers||[]).some(x=>x.no===NEW&&partyNaksh(x))||
+    !(merged.challans||[]).some(x=>x.documentNo==='AFX/DC/004'&&partyNaksh(x))||
+    !(merged.workOrders||[]).some(x=>x.workNo==='AFX-WO-0008'&&partyNaksh(x)))
+  throw Error('Post-merge checks failed. No data changed.');
+ // No original unique record from either side may disappear.
+ const oldLocalInvIds=new Set((localBefore.invoices||[]).filter(x=>!partyNaksh(x)).map(docNumber));
+ const mergedInvIds=new Set((merged.invoices||[]).map(docNumber));
+ for(const no of oldLocalInvIds)if(!mergedInvIds.has(no))throw Error('A local invoice is missing: '+no);
+ for(const x of (cloudBefore.invoices||[]))
+  if(!mergedInvIds.has(docNumber(x)))throw Error('A Cloud invoice is missing: '+docNumber(x));
+ return merged;
+}
+function downloadNakshSafetyBundle(info){
+ const raw=JSON.stringify({
+  application:'Aerovex ERP',type:'Pre-Reconciliation Safety Backup',
+  generatedAt:new Date().toISOString(),
+  instructions:'Contains BOTH snapshots before any change, plus a proposed merge. Keep this file safe.',
+  proposedCorrection:'NAKSH Invoice/Voucher AFX/INV/003 to AFX/INV/004; preserve Pragna 003',
+  deviceBefore:info.localBefore,
+  cloudBefore:{updated_at:info.cloudBefore.updated_at,payload:info.cloudBefore.payload},
+  proposedMergedData:info.merged
+ });
+ const url=URL.createObjectURL(new Blob([raw],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='Aerovex-NAKSH-Reconciliation-SAFETY-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+async function prepareNakshRepair(){
+ if(!session)return status('Sign in as Owner first.');
+ if(busy)return status('Wait for the running sync operation.');
+ if(window.axERPStorageBridge)try{await window.axERPStorageBridge.flush()}catch(e){return status('Device storage error: '+e.message+'. Repair blocked.')}
+ busy=true;pendingNakshRepair=null;
+ const applyButton=$('axNakshApply');
+ if(applyButton)applyButton.disabled=true;
+ try{
+  const row=await cloud();
+  if(!row)return status('Cloud snapshot not found. Nothing changed.');
+  const device=local();
+  const merged=buildNakshRepair(device,row.payload);
+  pendingNakshRepair={localBefore:device,cloudBefore:row,merged};
+  downloadNakshSafetyBundle(pendingNakshRepair);
+  if(applyButton)applyButton.disabled=false;
+  status('✓ SAFE MERGE PREPARED (NOT APPLIED). NAKSH Invoice 003 → 004; Pragna 003 kept. Download the SAFETY JSON and verify it exists in Downloads. Then click Apply Verified Repair.');
+ }catch(e){status('Repair preview blocked safely: '+e.message+'. No Cloud/device data changed.')}
+ finally{busy=false}
+}
+async function applyNakshRepair(){
+ if(!session)return status('Sign in as Owner first.');
+ if(busy||!pendingNakshRepair)return status('Prepare the safety merge and download backup first.');
+ if(!confirm('CONFIRM: SAFETY JSON exists in Downloads. Renumber ONLY NAKSH Invoice and its Sales Voucher from AFX/INV/003 to AFX/INV/004, keep the existing Pragna 003 voucher, and merge missing NAKSH Work Order/Challan/Invoice into the shared Cloud. Proceed?'))
+  return status('Cancelled. No data changed.');
+ busy=true;paused=true;online=false;clearInterval(timer);timer=null;
+ const info=pendingNakshRepair;
+ try{
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  if(stable(local())!==stable(info.localBefore))
+   throw Error('Laptop/mobile ERP data changed after backup. Prepare a NEW safety merge.');
+  const latest=await cloud();
+  if(!latest||latest.updated_at!==info.cloudBefore.updated_at||
+    stable(latest.payload)!==stable(info.cloudBefore.payload))
+   throw Error('Cloud changed after preview. Prepare a NEW safety merge.');
+  // Re-evaluate the exact amendment under the verified snapshots.
+  const checked=buildNakshRepair(local(),latest.payload);
+  if(stable(checked)!==stable(info.merged))throw Error('Reconciliation verification failed. Nothing changed.');
+  const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+
+    '&updated_at=eq.'+encodeURIComponent(latest.updated_at)+'&select=updated_at';
+  const result=await send(where,'PATCH',{payload:checked,updated_at:new Date().toISOString()},
+    {Prefer:'return=representation'});
+  if(!Array.isArray(result)||result.length!==1)
+   throw Error('Cloud changed during repair. Recheck before retry.');
+  const verified=await cloud();
+  if(!verified||stable(verified.payload)!==stable(checked))
+   throw Error('Cloud read-back did not match. Do not repeat; review Cloud status.');
+  await setCurrent(checked);
+  role(IS_MOBILE?'mobile':'pc');
+  await markSynced(checked,verified.updated_at);
+  paused=false;online=true;start();pendingNakshRepair=null;
+  const applyButton=$('axNakshApply');if(applyButton)applyButton.disabled=true;
+  status('✓ VERIFIED: NAKSH Invoice AFX/INV/004, original Pragna Voucher 003 retained. Missing Work Order + Challan + Invoice merged. Cloud and '+(IS_MOBILE?'Mobile':'Laptop')+' now match; two-way Sync ON.');
+ }catch(e){
+  status('⚠ Repair stopped: '+e.message+'. Keep your SAFETY JSON. Check both copies before repeating.');
+  pendingNakshRepair=null;const applyButton=$('axNakshApply');if(applyButton)applyButton.disabled=true;
+ }finally{busy=false}
+}
 async function join(){
  if(!session)return status('Sign in first.');
  if(busy)return status('Another sync operation is in progress. Wait a moment.');
@@ -412,7 +556,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px">Only use on the device holding the unsent NAKSH Invoice 003. This keeps the Pragna 003 voucher and renumbers only NAKSH to 004.</p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -421,6 +565,8 @@ function panel(){
  $('ax2Join').onclick=join;
  $('ax2Resume').onclick=resume;
  $('ax2Repair').onclick=repairOldCloud;
+ $('axNakshPrepare').onclick=prepareNakshRepair;
+ $('axNakshApply').onclick=applyNakshRepair;
  status(lastMessage);
 }
 function init(){
