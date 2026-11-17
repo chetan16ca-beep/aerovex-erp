@@ -272,7 +272,7 @@ function reconstructSalesOrder(form,number){
  // Some legacy handlers write a cloned ERP snapshot BEFORE adding the order
  // to db.salesOrders. If quota is exceeded there, recover the complete form.
  const record=Object.fromEntries(new FormData(form));
- const keys=['description','moc','size','hsn','qty','unit','rate','discount'];
+ const keys=['description','moc','micron','size','hsn','qty','unit','rate','discount'];
  record.items=[...form.querySelectorAll('.axDocLine')].map(row=>{
   const line={};
   for(const key of keys){
