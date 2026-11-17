@@ -11,6 +11,7 @@ const KEY='sb_publishable_EXF3rH1gM0bMF6yhGWiUig_XsCa3MrM';
 const OWNER='aerovexfiltration@gmail.com';
 const LOCAL='aerovex-erp-data-v1',SESSION='aerovex-2device-session-v3',DEVICE='aerovex-2device-role-v3';
 const INTERVAL=8000;
+const BASELINE_KEY='aerovex-sync-baseline-v1',PAIRED_KEY='aerovex-sync-paired-role-v1';
 const IS_MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 let session=null, baseline=null, stamp=null, timer=null, busy=false, paused=false, online=false, lastMessage='Not connected';
 const $=id=>document.getElementById(id);
@@ -54,6 +55,62 @@ async function cloud(){
   return Array.isArray(r)?r[0]||null:null;
 }
 function role(value){if(value==='mobile'||value==='pc')sessionStorage.setItem(DEVICE,value)}
+async function markSynced(data,cloudStamp){
+ // Preserve a verified common ancestor in IndexedDB for safe cross-device
+ // three-way merges, even after browser/ERP restart.
+ const prior={payload:data,stamp:cloudStamp};
+ localStorage.setItem(BASELINE_KEY,JSON.stringify(prior));
+ localStorage.setItem(PAIRED_KEY,IS_MOBILE?'mobile':'pc');
+ if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+ baseline=stable(data);
+ stamp=cloudStamp;
+}
+function savedBaseline(){
+ try{
+  const v=JSON.parse(localStorage.getItem(BASELINE_KEY)||'null');
+  if(v&&v.payload&&typeof v.payload==='object'&&!Array.isArray(v.payload)&&v.stamp)return v;
+ }catch(_){}
+ return null;
+}
+/* Before first device pairing, combine only genuinely non-conflicting records.
+ * No missing customer, invoice, challan, PO or stock record is discarded.
+ * Ambiguous entries / conflicting edits require manual review.
+ */
+function firstJoinMerge(mine,remote){
+ const out={},keys=new Set([...Object.keys(remote),...Object.keys(mine)]);
+ const ambiguous=new Set(['cutting','departmentWork','packing','receipts','payments','expenses','ledger']);
+ for(const k of keys){
+  const a=mine[k],b=remote[k];
+  if(a===undefined){out[k]=b;continue}
+  if(b===undefined){out[k]=a;continue}
+  if(stable(a)===stable(b)){out[k]=b;continue}
+  if(Array.isArray(a)&&Array.isArray(b)){
+   if(ambiguous.has(k)){
+    const prefix=(left,right)=>left.length<=right.length&&left.every((x,i)=>stable(x)===stable(right[i]));
+    if(prefix(a,b)){out[k]=b;continue}
+    if(prefix(b,a)){out[k]=a;continue}
+    throw Error(k+' contains unsynced entries without unique IDs. Data is safe; manual reconciliation required.');
+   }
+   const merged=b.slice(),known=new Map();
+   for(const x of b){const key=id(k,x);if(known.has(key)&&stable(known.get(key))!==stable(x))
+      throw Error(k+' has conflicting duplicate identifiers in Cloud');
+     known.set(key,x);
+   }
+   for(const x of a){
+    const key=id(k,x),prior=known.get(key);
+    if(prior){
+     if(stable(prior)!==stable(x))
+      throw Error(k+': same document or master ID contains different data on each device. Not overwritten.');
+    }else{merged.push(x);known.set(key,x)}
+   }
+   out[k]=merged;
+   continue;
+  }
+  // Company/tax/banking settings cannot silently choose one side.
+  throw Error(k+' settings differ between this device and Cloud. Back up both and reconcile.');
+ }
+ return out;
+}
 function stop(reason){paused=true;online=false;clearInterval(timer);timer=null;status('⚠ '+reason+' No data was replaced. Back up both devices before resolving.')}
 function modalIsOpen(){const m=$('modal');return m&&!m.classList.contains('hidden')}
 function isLocked(){return document.body?.classList.contains('axAuthLocked')}
@@ -219,9 +276,9 @@ async function mergeConcurrent(cloudRow,ourSnapshot){
     const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(cloudRow.updated_at)+'&select=updated_at';
     const updated=await send(where,'PATCH',{payload:combined,updated_at:at},{Prefer:'return=representation'});
     if(!Array.isArray(updated)||updated.length!==1)return status('Cloud changed during merge. Retrying safely on next sync.');
-    await setCurrent(combined);baseline=stable(local());stamp=updated[0].updated_at;
+    await setCurrent(combined);await markSynced(combined,updated[0].updated_at);
   }else{
-    await setCurrent(cloudRow.payload);baseline=stable(local());stamp=cloudRow.updated_at;
+    await setCurrent(cloudRow.payload);await markSynced(cloudRow.payload,cloudRow.updated_at);
   }
   status('✓ Both devices updated — different entries merged safely at '+date());
 }
@@ -236,35 +293,67 @@ async function initial(){
     const data=local();
     const r=await send('/rest/v1/erp_snapshots?on_conflict=user_id','POST',{user_id:session.user.id,payload:data,updated_at:new Date().toISOString()},{Prefer:'resolution=ignore-duplicates,return=representation'});
     if(!Array.isArray(r)||r.length!==1)throw Error('Cloud already initialized elsewhere. Data not changed.');
-    role('mobile');baseline=stable(data);stamp=r[0].updated_at;paused=false;online=true;start();
+    role(IS_MOBILE?'mobile':'pc');await markSynced(data,r[0].updated_at);paused=false;online=true;start();
     status('✓ Mobile source uploaded safely. PC can now join. Auto Sync checks every 8 seconds while open.');
   }catch(e){stop('Mobile initialization failed: '+e.message)}
 }
 async function join(){
  if(!session)return status('Sign in first.');
+ if(busy)return status('Another sync operation is in progress. Wait a moment.');
+ busy=true;
  try{
   const c=await cloud();
-  if(!c)return status('Cloud has no data. First initialize from your MOBILE.');
-  const previous=local(),missing=localOnly(previous,c.payload);
-  if(missing.length){stop('This device has '+missing.length+' records missing in cloud: '+missing.slice(0,3).join('; ')+'. Join blocked.');return}
-  if(stable(previous)!==stable(c.payload)){
-   if(!confirm('This device has older or different values. Save a safety backup, then load the cloud copy here? This changes only this device; cloud data is not overwritten.'))return;
+  if(!c)return status('Cloud is empty. Backup the most complete device, then initialize only once.');
+  const mine=local();
+  let merged;
+  try{merged=firstJoinMerge(mine,c.payload)}
+  catch(e){return stop('Join requires reconciliation: '+e.message)}
+  const sameCloud=stable(merged)===stable(c.payload);
+  const sameDevice=stable(merged)===stable(mine);
+  if(!sameCloud||!sameDevice){
+   const localOnlyList=localOnly(mine,c.payload),cloudOnlyList=localOnly(c.payload,mine);
+   if(!confirm('CONNECT '+(IS_MOBILE?'MOBILE':'LAPTOP')+' TO AEROVEX CLOUD?\n'+
+    'Local-only records: '+localOnlyList.length+', Cloud-only records: '+cloudOnlyList.length+
+    '. This safe merge keeps both sets, with NO conflicting ID changes.\n'+
+    'First download this device backup, and keep a Cloud backup. Continue?'))return status('Join cancelled. Neither data copy was changed.');
    backup();
-   if(modalIsOpen())return status('Close the open form before joining.');
-   await setCurrent(c.payload);
+   if(modalIsOpen())return status('Close the open form before connecting.');
   }
-  role(IS_MOBILE?'mobile':'pc');baseline=stable(local());stamp=c.updated_at;paused=false;online=true;start();
-  status('✓ '+(IS_MOBILE?'Mobile':'Laptop')+' connected to shared Cloud. Auto Sync checks every 8 seconds.');
- }catch(e){stop('PC join failed: '+e.message)}
+  let joinedStamp=c.updated_at;
+  if(!sameCloud){
+   const path='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+
+      '&updated_at=eq.'+encodeURIComponent(c.updated_at)+'&select=updated_at';
+   const response=await send(path,'PATCH',{payload:merged,updated_at:new Date().toISOString()},
+      {Prefer:'return=representation'});
+   if(!Array.isArray(response)||response.length!==1)
+      return stop('Cloud changed while merging. No existing records overwritten. Please retry Connect / Join.');
+   joinedStamp=response[0].updated_at;
+   const verify=await cloud();
+   if(!verify||stable(verify.payload)!==stable(merged))
+      return stop('Cloud merge was not verified; do not create new entries until rechecked.');
+  }
+  if(!sameDevice)await setCurrent(merged);
+  role(IS_MOBILE?'mobile':'pc');
+  await markSynced(merged,joinedStamp);
+  paused=false;online=true;start();
+  status('✓ '+(IS_MOBILE?'Mobile':'Laptop')+' connected. Cloud and device records reconciled, verified; two-way sync ON.');
+ }catch(e){stop('Device Connect / Join failed: '+e.message)}
+ finally{busy=false}
 }
 async function resume(){
  if(!session)return status('Sign in first.');
- if(!sessionStorage.getItem(DEVICE))return status('Choose Mobile Initialize or PC Join first.');
+ const saved=savedBaseline();
+ const roleName=localStorage.getItem(PAIRED_KEY)||sessionStorage.getItem(DEVICE);
+ if(!saved||!roleName)return status('This device is not yet paired. Download backup, then Connect / Join.');
  try{
-   const c=await cloud();if(!c)return status('No cloud data yet. Initialize from Mobile first.');
-   if(stable(local())!==stable(c.payload))return status('Local and cloud differ. No overwrite. PC: use Join after reviewing/backup.');
-   baseline=stable(local());stamp=c.updated_at;paused=false;online=true;start();status('✓ Shared data verified. Auto Sync ON; every 8 seconds while open.');
- }catch(e){status('Cloud is unreachable: '+e.message)}
+  const c=await cloud();if(!c)return status('Cloud data missing. Existing local records preserved.');
+  role(roleName);
+  baseline=stable(saved.payload);stamp=saved.stamp;
+  paused=false;online=true;start();
+  // Check the live Cloud against the common ancestor. Never overwrite local edits.
+  await tick();
+  if(online&&!paused)status('✓ Two-way sync connected for '+(IS_MOBILE?'Mobile':'Laptop')+'; checks every 8 seconds.');
+ }catch(e){stop('Resume failed: '+e.message)}
 }
 async function tick(){
  // Both devices sync after authenticated pairing; wait for durable writes.
@@ -284,7 +373,7 @@ async function tick(){
    if(modalIsOpen())return status('New cloud data waiting. Close the form to refresh safely.');
    const missing=localOnly(JSON.parse(here),c.payload);
    if(missing.length)return stop('Cloud update lacks '+missing.length+' local entries — review needed.');
-   await setCurrent(c.payload);baseline=stable(local());stamp=c.updated_at;status('✓ Downloaded latest Aerovex update at '+date());return;
+   await setCurrent(c.payload);await markSynced(c.payload,c.updated_at);status('✓ Downloaded latest Aerovex update at '+date());return;
   }
   if(localChanged){
    // Conditional PATCH is atomic: a competing device cannot overwrite unseen changes.
@@ -293,7 +382,7 @@ async function tick(){
    const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(stamp)+'&select=updated_at';
    const updated=await send(where,'PATCH',{payload:local(),updated_at:at},{Prefer:'return=representation'});
    if(!Array.isArray(updated)||updated.length!==1)return stop('Cloud changed during upload. Conflict prevented.');
-   baseline=here;stamp=updated[0].updated_at;status('✓ Saved this device changes to cloud at '+date());return;
+   await markSynced(local(),updated[0].updated_at);status('✓ Saved this device changes to cloud at '+date());return;
   }
  }catch(e){
   // Network failures leave both copies untouched; next poll retries.
@@ -307,7 +396,7 @@ async function loadState(){
  if(!session)return;
  try{
   const c=await cloud();status(c?'Cloud exists. Pair exactly Mobile and PC.':'Cloud is empty. Initialize from Mobile.');
-  if(sessionStorage.getItem(DEVICE)&&c)await resume();
+  if((sessionStorage.getItem(DEVICE)||localStorage.getItem(PAIRED_KEY))&&c)await resume();
  }catch(e){status('Cloud check failed: '+e.message)}
 }
 async function boot(){
