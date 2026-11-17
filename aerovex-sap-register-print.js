@@ -27,6 +27,20 @@ function printRegister(key,ttl,onlyIndex=null){
  const head='<thead><tr><th>NO.</th><th>DOC / SRL NO.</th><th>DATE</th><th>PARTY / REFERENCE</th><th>ITEM / DETAILS</th><th>QTY / STATUS</th>'+(hide?'':'<th>VALUE</th>')+'</tr></thead>';
  const rows=list.map((x,i)=>'<tr><td>'+E(i+1)+'</td><td><b>'+E(ref(x))+'</b></td><td>'+E(x.date||x.createdAt||'—')+'</td><td>'+E(x.party||x.customer||x.supplier||x.person||x.name||'—')+'</td><td>'+E(desc(x,type)||x.remarks||x.remark||x.description||'—')+'</td><td>'+E(qty(x,type))+'</td>'+(hide?'':'<td>'+m(x.total??x.amount??(type==='store'?null:x.value))+'</td>')+'</tr>').join('');
  const count=list.length;
+ // Mobile Print / Save PDF works without popup; data stays read-only.
+ if(typeof window.axPrintSafe==='function'){
+  const printable='<main class="axSapRegister"><header class="axSapRegHead"><div class="axSapRegCompany">'+logo()+
+   '<div>'+(logo()?'':'<h1>AEROVEX FILTRATION</h1>')+
+   '<small>Smart Filtration Solutions</small></div></div><div><small>ENTERPRISE PRINT REGISTER</small><h2>'+E(details)+
+   '</h2><span>'+count+' RECORD(S)</span></div></header>'+
+   '<div class="axSapRegControls"><div>REGISTER: '+E(details)+'</div><div>PRINTED ON: '+
+   E(new Date().toLocaleDateString('en-IN'))+'</div></div>'+
+   '<table class="axSapRegTable">'+head+'<tbody>'+rows+'</tbody></table>'+
+   (count?'':'<p>No records found in the selected register.</p>')+
+   '<footer>Smart Filtration Solutions · <b>For AEROVEX FILTRATION</b></footer></main>';
+  const uri=new URL('aerovex-sap-register-print.css?v=2',document.baseURI).href;
+  return window.axPrintSafe({html:printable,title:details+' — Aerovex',cssUrl:uri,landscape:true});
+ }
  const w=window.open('','_blank');if(!w){alert('Allow pop-ups to Print / Save PDF');return true}
  const write=()=>{
   if(w.closed)return;
