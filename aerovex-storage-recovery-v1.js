@@ -78,7 +78,7 @@ function refresh(){
   const items=keys().filter(k=>!/auth|token|secret|session|password/i.test(k))
    .map(k=>({key:k,bytes:size(localStorage.getItem(k)||'')}))
    .sort((a,b)=>b.bytes-a.bytes).slice(0,10);
-  listing.textContent=items.length?items.map(x=>x.key+' — '+fmt(x.bytes)).join('\\n'):
+  listing.textContent=items.length?items.map(x=>x.key+' — '+fmt(x.bytes)).join('\n'):
    'No storage keys found.';
  }
 }
