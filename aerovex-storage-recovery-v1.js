@@ -126,6 +126,32 @@ async function optimize(){
  }catch(e){setStatus('Repair stopped safely after '+moved+' snapshot(s): '+e.message+'. Unmoved records remain intact.')}
  finally{refresh();if(btn)btn.disabled=false}
 }
+let idbBackupRequested=false;
+async function durableBackup(){
+ const bridge=window.axERPStorageBridge;
+ if(!bridge)return setStatus('IndexedDB storage bridge not ready. Reload latest ERP; do not clear site data.');
+ const b=bridge.status();
+ if(!b.ready||b.error)return setStatus('IndexedDB not verified: '+(b.error||'Migration unavailable')+'. No data changed.');
+ try{
+  setStatus('Exporting current IndexedDB data to JSON…');
+  const names=await bridge.exportBackup();
+  idbBackupRequested=true;
+  setStatus('IndexedDB backup download requested ('+names.length+' records). Confirm the JSON file exists in Downloads.');
+ }catch(e){setStatus('IndexedDB backup failed: '+e.message+'. No records removed.')}
+}
+async function releaseOldCopy(){
+ const bridge=window.axERPStorageBridge;
+ if(!bridge)return setStatus('Storage bridge missing; no data removed.');
+ const state=bridge.status();
+ if(!state.ready||state.error||state.pending)return setStatus('IndexedDB is not verified. No data removed.');
+ if(!idbBackupRequested)return setStatus('First press Download IndexedDB Backup and verify the JSON file exists in Downloads.');
+ if(!confirm('Do you have the downloaded Aerovex-IndexedDB-Full-Backup JSON in Downloads? Release only the old duplicate localStorage copy, AFTER verifying IndexedDB. No business records are deleted.'))return;
+ try{
+  const out=await bridge.freeLegacySpace();
+  setStatus('✓ Old duplicate released: '+fmt(out.freed)+'. Current ERP data remains in IndexedDB. Do not clear Chrome site data.');
+  refresh();
+ }catch(e){setStatus('Safe release blocked: '+e.message+'. No Cloud data touched.')}
+}
 function testPrint(){
  if(typeof window.axPrintSafe!=='function')return setStatus('PDF print module not loaded. Reload once, without clearing browser data.');
  window.axPrintSafe({
@@ -136,12 +162,14 @@ function testPrint(){
 }
 function open(){
  if(typeof show!=='function')return alert('ERP is still loading; reopen Storage Repair.');
- show('Storage Repair & Safety Backup','<div id="axStoragePanel" style="padding:9px;line-height:1.6"><p id="axStorageRepairSummary"></p><p>First download and check your backup. Nothing will be deleted automatically.</p><button type="button" id="axStorageBackup">Download Complete Phone Backup</button> <button type="button" id="axStorageRepair">Move Old Snapshots to Safe Archive</button> <button type="button" id="axStoragePrintTest">Test A4 PDF Print</button><p id="axStorageRepairStatus" role="status">Active ERP data stays unchanged.</p><h3>Largest browser storage items (sizes only)</h3><pre id="axStorageItemSizes" style="white-space:pre-wrap;word-break:break-word;font-size:12px"></pre><p>Each browser website has a separate localStorage limit. Print test does not modify orders, bills or stock.</p></div>');
+ show('Storage Repair & Safety Backup','<div id="axStoragePanel" style="padding:9px;line-height:1.6"><p id="axStorageRepairSummary"></p><p>First download and check your backup. Nothing will be deleted automatically.</p><button type="button" id="axStorageBackup">Download Complete Phone Backup</button> <button type="button" id="axStorageRepair">Move Old Snapshots to Safe Archive</button> <button type="button" id="axStoragePrintTest">Test A4 PDF Print</button> <button type="button" id="axIndexedDBExport">Download IndexedDB Backup</button> <button type="button" id="axReleaseOldCopy">Release Verified Old LocalStorage Copy</button><p id="axStorageRepairStatus" role="status">Active ERP data stays unchanged.</p><h3>Largest browser storage items (sizes only)</h3><pre id="axStorageItemSizes" style="white-space:pre-wrap;word-break:break-word;font-size:12px"></pre><p>Each browser website has a separate localStorage limit. Print test does not modify orders, bills or stock.</p></div>');
  const backupBtn=document.getElementById('axStorageBackup'),repairBtn=document.getElementById('axStorageRepair');
  if(backupBtn)backupBtn.onclick=backup;
  if(repairBtn)repairBtn.onclick=optimize;
  const printBtn=document.getElementById('axStoragePrintTest');
  if(printBtn)printBtn.onclick=testPrint;
+ const exportBtn=document.getElementById('axIndexedDBExport');if(exportBtn)exportBtn.onclick=durableBackup;
+ const releaseBtn=document.getElementById('axReleaseOldCopy');if(releaseBtn)releaseBtn.onclick=releaseOldCopy;
  refresh();
 }
 function init(){
