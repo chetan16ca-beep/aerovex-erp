@@ -74,17 +74,16 @@ async function readCloud(ctx){
   throw Error('Existing cloud Sales Order list unavailable. Nothing uploaded.');
  return list[0];
 }
+function canon(x){
+ if(Array.isArray(x))return x.map(canon);
+ if(x&&typeof x==='object')
+  return Object.fromEntries(Object.keys(x).sort().map(k=>[k,canon(x[k])]));
+ return x;
+}
 function equalDocs(a,b){
- // JSONB reorders object properties. Compare the business-critical fields
- // when checking a saved document (never overwrite conflicting same numbers).
- const pick=o=>({
-  no:getNo(o),party:text(o?.party),date:text(o?.date),
-  items:(Array.isArray(o?.items)?o.items:[]).map(x=>({
-   description:text(x.description),hsn:text(x.hsn),
-   qty:Number(x.qty),rate:Number(x.rate),size:text(x.size),unit:text(x.unit)
-  }))
- });
- return JSON.stringify(pick(a))===JSON.stringify(pick(b));
+ // Compare ALL fields. Never mistake a different GSTIN, billing/ship-to
+ // address, tax or commercial term for the same saved sales order.
+ return JSON.stringify(canon(a))===JSON.stringify(canon(b));
 }
 async function upload(number){
  if(uploading)return showState('Cloud Save already running. Please do not press Save again.','busy',null);
