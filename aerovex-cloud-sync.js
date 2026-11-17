@@ -152,7 +152,7 @@ function id(k,x){
       :k==='purchases'?x.documentNo||x.invoiceNo||(String(x.gstin||'')+'|'+String(x.supplierInvoice||''))
       :k==='vouchers'?String(x.type||'')+'|'+String(x.no||'')+'|'+String(x.date||'')
       :k==='store'?x.srl||x.serial||x.srlNo
-      :k==='products'?x.code||x.productCode||x.name
+      :k==='products'?x.itemNo||x.itemCode||x.code||x.productCode||x.name
       :k==='departmentWork'||k==='cutting'||k==='receipts'||k==='payments'||k==='expenses'?null
       :x.id||x.no;
   return s?String(s).trim().toLowerCase():stable(x);
