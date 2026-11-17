@@ -664,6 +664,9 @@ function buildBothWrongQuotesMerge(mobile,remote){
  const sameGoods=(a,b)=>a?.party==='NAKSH ENTERPRISE'&&b?.party==='NAKSH ENTERPRISE'&&
    String(a.gstin)==='24AAUFN6527B1Z7'&&String(b.gstin)==='24AAUFN6527B1Z7'&&
    Number(a.total)===13765.5&&Number(b.total)===13765.5&&
+   Number(a.taxable)===13110&&Number(b.taxable)===13110&&
+   Number(a.gst)===655.5&&Number(b.gst)===655.5&&
+   Number(a.gstRate)===5&&Number(b.gstRate)===5&&
    a.items?.length===1&&b.items?.length===1&&
    Number(a.items[0].qty)===46&&Number(b.items[0].qty)===46&&
    Number(a.items[0].rate)===285&&Number(b.items[0].rate)===285&&
@@ -786,21 +789,24 @@ async function applyBothWrongQuoteRepair(){
     stable(latest.payload)!==stable(plan.cloudBefore.payload))
    throw Error('Cloud changed since 5A. Run 5A again to avoid overwriting new entries.');
   const verifiedPlan=buildBothWrongQuotesMerge(device,latest.payload);
-  // Archive timestamps only are different after second run; compare all
-  // business sections, then use the new fully validated merged payload.
-  if(stable(verifiedPlan.quotations)!==stable(plan.merged.quotations)||
-     stable(verifiedPlan.invoices)!==stable(plan.merged.invoices))
-   throw Error('A quotation/invoice changed. Nothing written.');
+  // Compare ALL proposed sections, ignoring only audit timestamps.
+  const withoutAuditTime=payload=>{
+   const value=clone(payload);
+   for(const row of value.reconciliationArchive||[])delete row.archivedAt;
+   return stable(value);
+  };
+  if(withoutAuditTime(verifiedPlan)!==withoutAuditTime(plan.merged))
+   throw Error('The proposed merge changed after preview. Nothing written.');
   const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+
     '&updated_at=eq.'+encodeURIComponent(latest.updated_at)+'&select=updated_at';
-  const response=await send(where,'PATCH',{payload:verifiedPlan,updated_at:new Date().toISOString()},{Prefer:'return=representation'});
+  const response=await send(where,'PATCH',{payload:plan.merged,updated_at:new Date().toISOString()},{Prefer:'return=representation'});
   if(!Array.isArray(response)||response.length!==1)
    throw Error('Cloud changed during safe merge. Read status before retrying.');
   const readback=await cloud();
-  if(!readback||stable(readback.payload)!==stable(verifiedPlan))
+  if(!readback||stable(readback.payload)!==stable(plan.merged))
    throw Error('Cloud read-back differs. Do not repeat. Saved backups are retained.');
-  await setCurrent(verifiedPlan);
-  await markSynced(verifiedPlan,readback.updated_at);
+  await setCurrent(plan.merged);
+  await markSynced(plan.merged,readback.updated_at);
   role(IS_MOBILE?'mobile':'pc');
   paused=false;online=true;start();pendingBothWrongQuotes=null;
   if($('axInvalidQuoteApply'))$('axInvalidQuoteApply').disabled=true;
@@ -925,7 +931,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:2147483200;bottom:8px;right:8px;width:min(425px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;pointer-events:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status" style="position:sticky;top:0;z-index:2;background:#eff8fb;color:#12435b;border:1px solid #bfd6df;border-radius:7px;padding:10px;overflow-wrap:anywhere">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview" style="display:block;width:100%;font-weight:700;font-size:15px;color:#fff;background:#0b607c;border:0;border-radius:8px;padding:15px;min-height:54px;touch-action:manipulation;cursor:pointer">4A. Backup + Preview Mobile 003 to 004</button><p id="axMobileNakshFeedback" role="status" aria-live="polite" style="display:none;border:1px solid #9cbece;border-radius:7px;padding:12px;background:#eff8fb;font-weight:700;overflow-wrap:anywhere"></p><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p><hr><p><b>Both AFX/QTN/003 Quotations are INVALID — Safe Reconciliation</b></p><p>Keep BOTH wrong quotations in audit archive, keep number 003 reserved, preserve NAKSH Invoice 004 and mobile costing. Preview first, then approve.</p><button type="button" id="axInvalidQuotePrepare" style="width:100%;font-weight:700;padding:14px;min-height:52px">5A. Backup + Preview Both Wrong QTN003</button><p id="axInvalidQuoteStatus" role="status" aria-live="polite" style="padding:8px;background:#eaf3f9;overflow-wrap:anywhere"></p><button type="button" id="axInvalidQuoteApply" disabled style="width:100%;padding:14px;min-height:50px">5B. Apply Verified Full Reconciliation</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status" style="position:sticky;top:0;z-index:2;background:#eff8fb;color:#12435b;border:1px solid #bfd6df;border-radius:7px;padding:10px;overflow-wrap:anywhere">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Old Invoice-only method superseded: use 5A below</b></p><button type="button" id="axMobileNakshPreview" style="display:none;width:100%;font-weight:700;font-size:15px;color:#fff;background:#0b607c;border:0;border-radius:8px;padding:15px;min-height:54px;touch-action:manipulation;cursor:pointer">4A. Backup + Preview Mobile 003 to 004</button><p id="axMobileNakshFeedback" role="status" aria-live="polite" style="display:none;border:1px solid #9cbece;border-radius:7px;padding:12px;background:#eff8fb;font-weight:700;overflow-wrap:anywhere"></p><p><button type="button" id="axMobileNakshApply" style="display:none" disabled>4B. Apply Verified Mobile Alignment</button></p><hr><p><b>Both AFX/QTN/003 Quotations are INVALID — Safe Reconciliation</b></p><p>Keep BOTH wrong quotations in audit archive, keep number 003 reserved, preserve NAKSH Invoice 004 and mobile costing. Preview first, then approve.</p><button type="button" id="axInvalidQuotePrepare" style="width:100%;font-weight:700;padding:14px;min-height:52px">5A. Backup + Preview Both Wrong QTN003</button><p id="axInvalidQuoteStatus" role="status" aria-live="polite" style="padding:8px;background:#eaf3f9;overflow-wrap:anywhere"></p><button type="button" id="axInvalidQuoteApply" disabled style="width:100%;padding:14px;min-height:50px">5B. Apply Verified Full Reconciliation</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
