@@ -11,7 +11,7 @@ const KEY='sb_publishable_EXF3rH1gM0bMF6yhGWiUig_XsCa3MrM';
 const OWNER='aerovexfiltration@gmail.com';
 const LOCAL='aerovex-erp-data-v1',SESSION='aerovex-2device-session-v3',DEVICE='aerovex-2device-role-v3';
 const INTERVAL=8000;
-const MOBILE_READ_ONLY=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+const IS_MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 let session=null, baseline=null, stamp=null, timer=null, busy=false, paused=false, online=false, lastMessage='Not connected';
 const $=id=>document.getElementById(id);
 const stable=v=>JSON.stringify(normalize(v));
@@ -44,7 +44,7 @@ async function auth(){
     const u=await send('/auth/v1/user');
     if(String(u?.email||'').toLowerCase()!==OWNER){sessionClear();throw Error('Only Aerovex owner account is accepted.')}
     if($('ax2Password'))$('ax2Password').value='';
-    status('Owner verified. Mobile: initialize cloud; PC: join the cloud.');
+    status('Owner verified. Connect / Join this device with existing Cloud (backup first).');
     await loadState();
   }catch(e){sessionClear();status('Login failed: '+e.message)}
 }
@@ -57,13 +57,15 @@ function role(value){if(value==='mobile'||value==='pc')sessionStorage.setItem(DE
 function stop(reason){paused=true;online=false;clearInterval(timer);timer=null;status('⚠ '+reason+' No data was replaced. Back up both devices before resolving.')}
 function modalIsOpen(){const m=$('modal');return m&&!m.classList.contains('hidden')}
 function isLocked(){return document.body?.classList.contains('axAuthLocked')}
-function setCurrent(payload){
+async function setCurrent(payload){
   // The previous value remains intact if a localStorage setItem exceeds quota.
   // Avoid keeping a SECOND full-sized ERP JSON in the small localStorage quota.
   // User-initiated full backups and verified IndexedDB archives remain available.
   const serialized=JSON.stringify(payload);
-  try{localStorage.setItem(LOCAL,serialized)}
-  catch(e){throw Error('Phone browser storage is full; existing ERP data is intact. Open Storage Repair / Backup. '+(e?.message||e))}
+  try{
+    localStorage.setItem(LOCAL,serialized);
+    if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  }catch(e){throw Error('Device storage failed; previous ERP records intact: '+(e?.message||e))}
   if(typeof db!=='undefined'&&db&&typeof db==='object'){
     const safe=typeof blank==='function'?Object.assign(blank(),payload):payload;
     for(const k of Object.keys(db))delete db[k];
@@ -217,16 +219,16 @@ async function mergeConcurrent(cloudRow,ourSnapshot){
     const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(cloudRow.updated_at)+'&select=updated_at';
     const updated=await send(where,'PATCH',{payload:combined,updated_at:at},{Prefer:'return=representation'});
     if(!Array.isArray(updated)||updated.length!==1)return status('Cloud changed during merge. Retrying safely on next sync.');
-    setCurrent(combined);baseline=stable(local());stamp=updated[0].updated_at;
+    await setCurrent(combined);baseline=stable(local());stamp=updated[0].updated_at;
   }else{
-    setCurrent(cloudRow.payload);baseline=stable(local());stamp=cloudRow.updated_at;
+    await setCurrent(cloudRow.payload);baseline=stable(local());stamp=cloudRow.updated_at;
   }
   status('✓ Both devices updated — different entries merged safely at '+date());
 }
 
 async function initial(){
   if(!session)return status('Sign in first.');
-  if(!confirm('MOBILE ONLY: Set this mobile as the starting Aerovex cloud data? This will not delete any existing cloud data. First download a backup.'))return;
+  if(!confirm('Initialize Cloud using THIS device as starting data? This will not delete any existing cloud data. First download a backup.'))return;
   try{
     backup();
     const c=await cloud();
@@ -249,10 +251,10 @@ async function join(){
    if(!confirm('This device has older or different values. Save a safety backup, then load the cloud copy here? This changes only this device; cloud data is not overwritten.'))return;
    backup();
    if(modalIsOpen())return status('Close the open form before joining.');
-   setCurrent(c.payload);
+   await setCurrent(c.payload);
   }
-  role('pc');baseline=stable(local());stamp=c.updated_at;paused=false;online=true;start();
-  status('✓ PC connected to shared Aerovex data. Auto Sync checks every 8 seconds while app is open.');
+  role(IS_MOBILE?'mobile':'pc');baseline=stable(local());stamp=c.updated_at;paused=false;online=true;start();
+  status('✓ '+(IS_MOBILE?'Mobile':'Laptop')+' connected to shared Cloud. Auto Sync checks every 8 seconds.');
  }catch(e){stop('PC join failed: '+e.message)}
 }
 async function resume(){
@@ -265,8 +267,12 @@ async function resume(){
  }catch(e){status('Cloud is unreachable: '+e.message)}
 }
 async function tick(){
- // Mobile must never auto-upload or overwrite cloud/phone from legacy sync.
- if(MOBILE_READ_ONLY)return;
+ // Both devices sync after authenticated pairing; wait for durable writes.
+ if(window.axERPStorageBridge){
+   const state=window.axERPStorageBridge.status();
+   if(state.error)return stop('Device IndexedDB failed: '+state.error);
+   if(state.pending>0)return;
+ }
  if(busy||!online||paused||!session||!stamp||document.hidden||isLocked())return;
  busy=true;
  try{
@@ -278,10 +284,11 @@ async function tick(){
    if(modalIsOpen())return status('New cloud data waiting. Close the form to refresh safely.');
    const missing=localOnly(JSON.parse(here),c.payload);
    if(missing.length)return stop('Cloud update lacks '+missing.length+' local entries — review needed.');
-   setCurrent(c.payload);baseline=stable(local());stamp=c.updated_at;status('✓ Downloaded latest Aerovex update at '+date());return;
+   await setCurrent(c.payload);baseline=stable(local());stamp=c.updated_at;status('✓ Downloaded latest Aerovex update at '+date());return;
   }
   if(localChanged){
    // Conditional PATCH is atomic: a competing device cannot overwrite unseen changes.
+   if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
    const at=new Date().toISOString();
    const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+'&updated_at=eq.'+encodeURIComponent(stamp)+'&select=updated_at';
    const updated=await send(where,'PATCH',{payload:local(),updated_at:at},{Prefer:'return=representation'});
@@ -305,7 +312,7 @@ async function loadState(){
 }
 async function boot(){
  try{
-  const data=JSON.parse(sessionStorage.getItem(SESSION)||'null');if(!data?.access_token)return;
+  const data=JSON.parse(sessionStorage.getItem(SESSION)||'null')||JSON.parse(sessionStorage.getItem('ax-erp-owner-session-v1')||'null');if(!data?.access_token)return;
   session=data;
   const u=await send('/auth/v1/user');
   if(String(u?.email||'').toLowerCase()!==OWNER)throw Error('Different user');
@@ -316,7 +323,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set on your mobile and PC. Changes appear automatically about every 8 seconds while the ERP is open and online.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Mobile: Initialize Shared Data</button><p><button type="button" id="ax2Join">2B. PC: Join Existing Shared Data</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -328,12 +335,12 @@ function panel(){
  status(lastMessage);
 }
 function init(){
- // Phone uses the separate authenticated Cloud Viewer; no pairing or editing.
- if(MOBILE_READ_ONLY)return;
+ // Mobile and laptop both run the editable ERP and sync securely.
  if($('axCloudButton'))return;
  const b=document.createElement('button');b.id='axCloudButton';b.textContent='☁ Cloud Sync';b.style.cssText='position:fixed;bottom:12px;right:12px;z-index:9998;padding:12px;border-radius:20px;background:#0b4961;color:white';
  b.onclick=panel;document.body.appendChild(b);
  boot();
+ window.addEventListener('ax-aerovex-owner-ready',boot);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
