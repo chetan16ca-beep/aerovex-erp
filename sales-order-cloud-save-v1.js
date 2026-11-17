@@ -231,6 +231,10 @@ function bind(form){
  if(typeof prior!=='function')return;
  form.onsubmit=function(event){
   event?.preventDefault?.();
+  if(typeof window.axHSNApplyLines!=='function'||typeof window.axHSNLookup!=='function'){
+   showState('✕ SALES ORDER NOT SAVED — HSN/GST module did not load. Reload ERP (do not clear data) and try again.','error',null);
+   return false;
+  }
   const check=salesOrderValidation(form);
   if(check.errors.length){
    showState('✕ SALES ORDER NOT SAVED — '+check.errors.join(' | ')+'. ये details भरकर Save दबाएँ.','error',null);
