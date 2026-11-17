@@ -135,22 +135,37 @@ function bind(form){
  const h=document.querySelector('#modalBody > h2');
  if(!h||text(h.textContent).toUpperCase()!=='SALES ORDER')return;
  form.dataset.axSOCSbound='1';
- // Capture runs before the existing synchronous onsubmit handler.
- // The microtask checks persistence after original Save & Preview finishes.
- form.addEventListener('submit',()=>{
+ // Wrap the existing synchronous Sales Order save after all document
+ // modules have bound it. Check that a new document really reached localStorage
+ // before starting the separately verified cloud upload.
+ const prior=form.onsubmit;
+ if(typeof prior!=='function')return;
+ form.onsubmit=function(event){
   const no=text(form.elements?.namedItem('documentNo')?.value);
-  const hadOrder=Array.isArray(window.db?.salesOrders)&&window.db.salesOrders.some(x=>getNo(x)===no);
-  const localNoBefore=(Array.isArray(db?.salesOrders)?db.salesOrders:[]).filter(x=>getNo(x)===no).length;
-  Promise.resolve().then(()=>{
-   if(!no||hadOrder||localNoBefore)return;
-   try{localOrder(no)}
-   catch(e){
-    showState('⚠ Sales Order '+no+' was NOT confirmed in phone storage: '+e.message,'warning',null);
-    return;
-   }
-   upload(no);
-  });
- },true);
+  const entries=Array.isArray(db?.salesOrders)?db.salesOrders:[];
+  const before=entries.slice();
+  let result;
+  try{
+   result=prior.call(this,event);
+  }catch(error){
+   // The native Save handler may push the order before localStorage throws.
+   // Restore just that in-memory SO list. Previous phone files are untouched.
+   if(Array.isArray(db?.salesOrders))db.salesOrders=before;
+   showState('✕ PHONE SAVE FAILED: '+text(error?.message||error)+'. Download device backup; do not assume it saved.','error',null);
+   return false;
+  }
+  const after=Array.isArray(db?.salesOrders)?db.salesOrders:[];
+  if(!no||before.some(x=>getNo(x)===no)||!after.some(x=>getNo(x)===no))return result;
+  try{localOrder(no)}
+  catch(e){
+   showState('⚠ Sales Order '+no+' NOT confirmed on phone: '+e.message,'warning',null);
+   return result;
+  }
+  // Original handler has already shown Save & Preview. Cloud confirmation
+  // appears in that preview and a retry option is provided on failure.
+  upload(no);
+  return result;
+ };
 }
 function watch(){
  const root=document.getElementById('modalBody');
