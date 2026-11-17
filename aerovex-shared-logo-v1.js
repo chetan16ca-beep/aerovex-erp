@@ -86,6 +86,8 @@ async function applyShared(){
  if(!shared||!valid(shared.src)||shared.src.length>MAX_LOGO_BYTES)return;
  if(shared.source!=='Laptop original')return;
  if(!window.axERPStorageBridge?.status()?.ready)return;
+ // NEVER overwrite the correct, original laptop logo with its optimized Cloud copy.
+ if(!mobile&&valid(deviceLogo())){priorVersion=shared.createdAt;return;}
  if(deviceLogo()===shared.src){priorVersion=shared.createdAt;return;}
  applying=true;
  try{
