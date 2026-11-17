@@ -458,6 +458,45 @@ async function applyNakshRepair(){
  * correct Cloud NAKSH 004. No Cloud write, no original invoice deletion.
  * Both versions are exported before a separate explicit Apply action. */
 let preparedMobileNaksh=null;
+/* Human-readable diagnostics; the backup contains exact original records.
+ * Differences shown in UI are field NAMES only, not private party details.
+ */
+function nakshDifferenceFields(left,right,prefix='',limit=40){
+ const out=[];
+ function walk(a,b,path){
+  if(out.length>=limit||stable(a)===stable(b))return;
+  if(a&&b&&typeof a==='object'&&typeof b==='object'&&Array.isArray(a)===Array.isArray(b)){
+   const keys=Array.isArray(a)?Array.from({length:Math.max(a.length,b.length)},(_,i)=>String(i)):
+     [...new Set([...Object.keys(a),...Object.keys(b)])].sort();
+   for(const k of keys){if(out.length>=limit)break;walk(a[k],b[k],Array.isArray(a)?path+'['+k+']':path?path+'.'+k:k)}
+  }else out.push(path||'(root)');
+ }
+ walk(left,right,prefix);
+ return out;
+}
+function nakshMobileDifferenceReport(device,remote){
+ const report=[];
+ const original=(device.invoices||[]).find(x=>partyNaksh(x)&&docNumber(x)==='AFX/INV/003');
+ const correct=(remote.invoices||[]).find(x=>partyNaksh(x)&&docNumber(x)==='AFX/INV/004');
+ if(original&&correct){
+  const copy=clone(original);copy.documentNo='AFX/INV/004';copy.invoiceNo='AFX/INV/004';
+  const fields=nakshDifferenceFields(copy,correct);
+  if(fields.length)report.push('Invoice fields: '+fields.join(', '));
+ }else report.push('Invoice count or number differs from expected 003/004');
+ const voucher=(device.vouchers||[]).find(x=>x.type==='Sales'&&x.no==='AFX/INV/003'&&partyNaksh(x));
+ const other=(remote.vouchers||[]).find(x=>x.type==='Sales'&&x.no==='AFX/INV/004'&&partyNaksh(x));
+ if(voucher&&other){
+  const copy=clone(voucher);copy.no='AFX/INV/004';
+  const fields=nakshDifferenceFields(copy,other);
+  if(fields.length)report.push('Voucher fields: '+fields.join(', '));
+ }else report.push('NAKSH Sales Voucher 003/004 missing or misnumbered');
+ const cats=['salesOrders','workOrders','challans','invoices','vouchers','parties','products','commissionAgents'];
+ for(const k of cats){
+  const a=Array.isArray(device[k])?device[k]:[],b=Array.isArray(remote[k])?remote[k]:[];
+  if(a.length!==b.length)report.push(k+' count: Phone '+a.length+' / Cloud '+b.length);
+ }
+ return report.slice(0,14);
+}
 function verifiedMobileNakshAlignment(device,cloudSnapshot){
  const mine=clone(device),remote=cloudSnapshot;
  const old=unique(mine.invoices,x=>docNumber(x)==='AFX/INV/003'&&partyNaksh(x),'Mobile NAKSH Invoice 003');
@@ -510,13 +549,22 @@ async function prepareMobileNaksh(){
   if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
   const current=local(),row=await cloud();
   if(!row)throw Error('Cloud unavailable; no action taken.');
-  inform('4A: Both phone and Cloud records loaded. Comparing invoice numbers safely…');
-  verifiedMobileNakshAlignment(current,row.payload);
-  preparedMobileNaksh={before:current,cloud:row};
-  exportMobileNakshSafety(preparedMobileNaksh);
+  // Download safety snapshot FIRST, even if validation finds a conflict.
+  // No overwrite or renumbering is permitted by this step.
+  const info={before:current,cloud:row};
+  exportMobileNakshSafety(info);
+  const report=nakshMobileDifferenceReport(current,row.payload);
+  inform('4A: Safety JSON download requested. Comparing invoice details…');
+  try{
+   verifiedMobileNakshAlignment(current,row.payload);
+  }catch(err){
+   inform('⚠ 4A BLOCKED — '+err.message+'. DIFFERENCES: '+(report.length?report.join(' | '):'No field summary available')+'. Check Downloads for Aerovex-MOBILE-NAKSH-003-TO-004-SAFETY JSON; send that file here. 4B stays locked. NO DATA CHANGED.');
+   return;
+  }
+  preparedMobileNaksh=info;
   if(apply)apply.disabled=false;
-  inform('✓ 4A COMPLETED: Backup JSON downloaded/requested. NAKSH 003 matches Cloud 004. Confirm the file in Downloads before pressing 4B. No records changed.');
- }catch(e){inform('⚠ 4A BLOCKED: '+e.message+'. No data changed. Save a screenshot of this message.')}
+  inform('✓ 4A COMPLETED: Safety JSON download requested. Invoice 003 agrees with Cloud 004 after number adjustment; 4B enabled. Confirm JSON exists in Downloads. No data changed.');
+ }catch(e){inform('⚠ 4A BLOCKED: '+e.message+'. No data changed. Save screenshot or download backup.')}
  finally{busy=false}
 }
 async function applyMobileNaksh(){
