@@ -198,14 +198,25 @@ function bind(form){
   try{
    result=prior.call(this,event);
   }catch(error){
-   // The native Save handler may push the order before localStorage throws.
-   // Restore just that in-memory SO list. Previous phone files are untouched.
+   // Preview rendering can fail *after* the phone storage write succeeded.
+   // Never roll back a genuinely persisted Sales Order.
+   let persisted=false;
+   if(no)try{localOrder(no);persisted=true}catch(ignore){}
+   if(persisted){
+    showState('✓ '+no+' saved on PHONE; Preview failed: '+text(error?.message||error)+'. Verifying Cloud…','warning',null);
+    upload(no);
+    return false;
+   }
    if(Array.isArray(db?.salesOrders))db.salesOrders=before;
-   showState('✕ PHONE SAVE FAILED: '+text(error?.message||error)+'. Download device backup; do not assume it saved.','error',null);
+   showState('✕ PHONE SAVE FAILED: '+text(error?.message||error)+'. Original orders kept. Check device storage and backup.','error',null);
    return false;
   }
   const after=Array.isArray(db?.salesOrders)?db.salesOrders:[];
-  if(!no||before.some(x=>getNo(x)===no)||!after.some(x=>getNo(x)===no))return result;
+  if(!no||before.some(x=>getNo(x)===no))return result;
+  if(!after.some(x=>getNo(x)===no)){
+   showState('⚠ Sales Order was NOT saved. Check Product, Quantity, HSN (4/6/8 digits), GST Type and duplicate Order No. Do not assume the order was created.','warning',null);
+   return result;
+  }
   try{localOrder(no)}
   catch(e){
    showState('⚠ Sales Order '+no+' NOT confirmed on phone: '+e.message,'warning',null);
