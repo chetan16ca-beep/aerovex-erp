@@ -93,6 +93,8 @@ function fill(form,selected,overwrite=true){
    }
   }
  }finally{delete form.dataset.axCustomerFilling}
+ const status=form.querySelector('#axSalesPartyStatus');
+ if(status&&data.gstin&&data.address)status.textContent='✓ Customer GSTIN + Bill To loaded. Verify Ship To / delivery address before saving.';
 }
 function bind(form){
  if(form.dataset.axCustomerBound||form.id==='axCustomerMasterForm'||form.id==='axEditSavedForm')return;
@@ -133,6 +135,12 @@ function bind(form){
   const c=list().find(x=>norm(x.name)===norm(input.value));
   if(c){select.value=String(c.i);fill(form,c.i,true)}
   else select.value='';
+ });
+ // Datalist selection and exact customer typing should fill without extra taps.
+ input.addEventListener('input',()=>{
+  if(form.dataset.axCustomerFilling==='1')return;
+  const c=list().find(x=>norm(x.name)===norm(input.value));
+  if(c){select.value=String(c.i);fill(form,c.i,true)}
  });
  const current=list().find(x=>norm(x.name)===norm(input.value));
  if(current)select.value=String(current.i);
