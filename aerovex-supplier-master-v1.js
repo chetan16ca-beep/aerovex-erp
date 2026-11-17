@@ -92,6 +92,8 @@ window.axSupplierMaster=function(){
   window.axSupplierMaster();
  };
 };
+// Owner login refreshes missing Supplier Master entries without a manual button.
+window.addEventListener('ax-aerovex-owner-ready',()=>axImportCloudSuppliers(false));
 const original=window.openModule;
 window.openModule=function(name){
  if(name==='Supplier Master'){window.axSupplierMaster();axImportCloudSuppliers(false);return}
