@@ -72,6 +72,15 @@ function setStatus(msg){
 function refresh(){
  const x=usage(),el=document.getElementById('axStorageRepairSummary');
  if(el)el.textContent='ERP data: '+fmt(x.core)+' | Browser storage used (estimated): '+fmt(x.total)+' | Extra archived snapshots: '+x.archives.length+'. Phone storage quota is different from total phone capacity.';
+ // Sizes only; never display sensitive values, passwords or document contents.
+ const listing=document.getElementById('axStorageItemSizes');
+ if(listing){
+  const items=keys().filter(k=>!/auth|token|secret|session|password/i.test(k))
+   .map(k=>({key:k,bytes:size(localStorage.getItem(k)||'')}))
+   .sort((a,b)=>b.bytes-a.bytes).slice(0,10);
+  listing.textContent=items.length?items.map(x=>x.key+' — '+fmt(x.bytes)).join('\\n'):
+   'No storage keys found.';
+ }
 }
 function download(payload,name){
  const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
@@ -117,12 +126,22 @@ async function optimize(){
  }catch(e){setStatus('Repair stopped safely after '+moved+' snapshot(s): '+e.message+'. Unmoved records remain intact.')}
  finally{refresh();if(btn)btn.disabled=false}
 }
+function testPrint(){
+ if(typeof window.axPrintSafe!=='function')return setStatus('PDF print module not loaded. Reload once, without clearing browser data.');
+ window.axPrintSafe({
+  title:'Aerovex Print Test — No customer data',
+  cssUrl:new URL('aerovex-sap-documents.css?v=2',document.baseURI).href,
+  html:'<article class="axSAPDocument"><h1>AEROVEX FILTRATION</h1><h2>PRINT TEST PAGE</h2><p>PDF preview verification only. No Sales Order, Invoice or Stock data was changed.</p><p>Visible A4 test content.</p></article>'
+ });
+}
 function open(){
  if(typeof show!=='function')return alert('ERP is still loading; reopen Storage Repair.');
- show('Storage Repair & Safety Backup','<div id="axStoragePanel" style="padding:9px;line-height:1.6"><p id="axStorageRepairSummary"></p><p>For Sales Orders, Cloud Save fallback handles a full phone quota. This tool safely archives only old duplicate rollback snapshots, never your live ERP database.</p><button type="button" id="axStorageBackup">Download Complete Phone Backup</button> <button type="button" id="axStorageRepair">Move Old Snapshots to Safe Archive</button><p id="axStorageRepairStatus" role="status">Your active data will not be deleted.</p></div>');
+ show('Storage Repair & Safety Backup','<div id="axStoragePanel" style="padding:9px;line-height:1.6"><p id="axStorageRepairSummary"></p><p>First download and check your backup. Nothing will be deleted automatically.</p><button type="button" id="axStorageBackup">Download Complete Phone Backup</button> <button type="button" id="axStorageRepair">Move Old Snapshots to Safe Archive</button> <button type="button" id="axStoragePrintTest">Test A4 PDF Print</button><p id="axStorageRepairStatus" role="status">Active ERP data stays unchanged.</p><h3>Largest browser storage items (sizes only)</h3><pre id="axStorageItemSizes" style="white-space:pre-wrap;word-break:break-word;font-size:12px"></pre><p>Each browser website has a separate localStorage limit. Print test does not modify orders, bills or stock.</p></div>');
  const backupBtn=document.getElementById('axStorageBackup'),repairBtn=document.getElementById('axStorageRepair');
  if(backupBtn)backupBtn.onclick=backup;
  if(repairBtn)repairBtn.onclick=optimize;
+ const printBtn=document.getElementById('axStoragePrintTest');
+ if(printBtn)printBtn.onclick=testPrint;
  refresh();
 }
 function init(){
