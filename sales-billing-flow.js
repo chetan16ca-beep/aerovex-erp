@@ -127,7 +127,7 @@ function renderChallan(){
  '<p class="axFlowHelp">Invoice quantities cannot exceed the selected Challan. Confirm GSTIN, HSN, tax type and rate before billing.</p>';
  document.getElementById('axFlowMakeINV')?.addEventListener('click',()=>convert('challan',selectedChallan));
 }
-function convert(kind,index){
+async function convert(kind,index){
  const source=arr(kind==='order'?'salesOrders':'challans')[index];if(!source)return alert('Original document not found.');
  const st=remaining(source,index,kind);
  if(st.problems.length)return alert('Conversion blocked: '+st.problems.join('; '));
@@ -175,7 +175,7 @@ function convert(kind,index){
   if(!Array.isArray(next.vouchers))next.vouchers=[];
   next.vouchers.push({type:'Sales',no:number,date:result.date,party:result.party||'',debit:result.total,credit:0,narration:'Invoice against Delivery Challan '+srcNo});
  }
- try{localStorage.setItem(KEY,JSON.stringify(next))}catch(error){alert('Nothing saved. Storage error: '+error.message);return}
+ try{localStorage.setItem(KEY,JSON.stringify(next));if(window.axERPStorageBridge)await window.axERPStorageBridge.flush()}catch(error){alert('NOT SAVED. Device storage verification failed: '+error.message+'. Keep this form open and check Storage Repair.');return}
  db[key].push(result);
  if(kind==='challan'){
   if(!Array.isArray(db.vouchers))db.vouchers=[];
@@ -183,7 +183,7 @@ function convert(kind,index){
  }
  const newIndex=db[key].length-1;
  if(kind==='order'){selectedChallan=newIndex;flash='Delivery Challan '+number+' saved. Select it below to create the Bill.';window.axOpenSalesBilling('challan',newIndex)}
- else {alert('GST Invoice '+number+' saved. You can now print / save PDF.');window.axDocPreview('Sales Invoice',newIndex)}
+ else {alert('GST Invoice '+number+' VERIFIED SAVED on this device. Wait for Cloud Sync confirmation before opening it on the other device. You can now print / save PDF.');window.axDocPreview('Sales Invoice',newIndex)}
 }
 const prior=window.openModule;
 window.openModule=function(name){if(name==='Sales Billing Flow')return window.axOpenSalesBilling();return prior.apply(this,arguments)};
