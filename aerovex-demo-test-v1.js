@@ -7,8 +7,8 @@ function numberFor(kind){
  for(const row of rows)for(const key of ['documentNo','invoiceNo','workNo','no'])if(row[key])values.push(String(row[key]));
  if(kind==='invoice')for(const row of db.vouchers||[])if(row.type==='Sales'&&row.no)values.push(String(row.no));
  let max=0;
- for(const v of values){const p=cfg[1]+'/';if(v.toUpperCase().startsWith(p.toUpperCase())){const n=v.slice(p.length);if(/^\d+$/.test(n))max=Math.max(max,Number(n));}}
- return cfg[1]+'/'+String(max+1).padStart(cfg[2],'0');
+ for(const v of values){const p=cfg[1]+(kind==='work'?'-':'/');if(v.toUpperCase().startsWith(p.toUpperCase())){const n=v.slice(p.length);if(/^\d+$/.test(n))max=Math.max(max,Number(n));}}
+ return cfg[1]+(kind==='work'?'-':'/')+String(max+1).padStart(cfg[2],'0');
 }
 function view(kind){
  const number=numberFor(kind);
