@@ -39,8 +39,8 @@ function itemTable(x,hideCommercial=false){
   const heading=window.axAFXCodeMaster?.resolve?.(z)?.code||get(z,'productCode');
   const description=get(z,'description','name')||'Description not recorded';
   return '<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td>'+
-  '<strong class="axSAPProductHeading" style="display:block;font-size:13px;color:#0b4961">'+esc(heading||description)+'</strong>'+
-  (heading?'<div style="margin-top:5px"><b>Description:</b> '+esc(description)+'</div>':'')+
+  '<strong class="axSAPProductHeading" style="display:block;font-size:13px;color:#0b4961">'+esc(heading||'CUSTOM ITEM')+'</strong>'+
+  '<div class="axSAPItemDescription" style="display:block;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:7px;padding-top:5px;border-top:1px solid #d3e2e9"><b>Description / Specifications:</b> '+esc(description)+'</div>'+
   '<small>'+[['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
   '<td>'+esc(get(z,'hsn')||get(x,'hsn')||'—')+'</td><td>'+esc(z.qty??'—')+'</td><td>'+esc(get(z,'unit')||get(x,'unit')||'—')+'</td>'+
   (hideCommercial?'':'<td>'+numberFormat(z.rate)+'</td><td>'+line+'</td>')+'</tr>';
