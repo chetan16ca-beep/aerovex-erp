@@ -154,7 +154,7 @@ function bindRow(row){
  const label=document.createElement('label');
  label.className='axAFXProductCodeChoice';
  label.style.cssText='display:block;grid-column:1/-1;padding:9px;background:#edf6fb;border:1px solid #c2dbe6;border-radius:8px;margin:6px 0;font-size:12px;font-weight:700;color:#0b4961';
- label.textContent='Main Heading — AFX Product Code (29 approved products)';
+ label.textContent='PRODUCT HEADING — AFX Product Code (code only)';
  const select=document.createElement('select');
  select.className='axAFXProductCodeSelect';select.style.cssText='display:block;width:100%;padding:11px;margin-top:6px;min-height:43px';
  select.innerHTML='<option value="">Select product code (or leave blank for custom item)</option>'+
@@ -168,8 +168,9 @@ function bindRow(row){
   const code=formField(row,'productCode'),number=formField(row,'itemNo');
   code.value=selected?.code||'';number.value=selected?.itemNo||'';
   if(selected){
-   if(!String(desc.value||'').trim())desc.value=selected.name;
-   desc.dispatchEvent(new Event('input',{bubbles:true}));
+   // Description is a separate editable field. Never put product name in the heading
+   // or silently replace the operator's technical specifications.
+   desc.setAttribute('placeholder','Write Description / Specifications separately for '+selected.name);
   }
  };
  if(found){formField(row,'productCode').value=found.code;formField(row,'itemNo').value=found.itemNo;}
@@ -183,12 +184,12 @@ function bindSimple(form){
  if(!/PRODUCT|QUOTATION|WORK ORDER/.test(heading))return;
  form.dataset.axAFXSimple='1';
  const wrapper=document.createElement('label');
- wrapper.textContent='Main Heading — AFX Product Code';
+ wrapper.textContent='PRODUCT HEADING — AFX Product Code (description entered separately)';
  const select=document.createElement('select');select.style.cssText='display:block;width:100%;padding:12px';
  select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code)+'</option>').join('');
  const code=document.createElement('input');code.type='hidden';code.name='productCode';
  const num=document.createElement('input');num.type='hidden';num.name='itemNo';
- select.onchange=()=>{const x=byCode.get(select.value);code.value=x?.code||'';num.value=x?.itemNo||'';if(x&&!input.value.trim())input.value=x.name;};
+ select.onchange=()=>{const x=byCode.get(select.value);code.value=x?.code||'';num.value=x?.itemNo||'';if(x)input.setAttribute('placeholder','Write Description / Specifications separately for '+x.name);};
  wrapper.append(select,code,num);
  input.closest('label')?.before(wrapper);
 }
