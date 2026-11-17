@@ -158,7 +158,7 @@ function bindRow(row){
  const select=document.createElement('select');
  select.className='axAFXProductCodeSelect';select.style.cssText='display:block;width:100%;padding:11px;margin-top:6px;min-height:43px';
  select.innerHTML='<option value="">Select product code (or leave blank for custom item)</option>'+
-  rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code+' · '+x.name)+'</option>').join('');
+  rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code)+'</option>').join('');
  label.appendChild(select);
  const existing=String(row.querySelector('[data-field="productCode"],[data-k="productCode"],[data-bill-field="productCode"],[data-key="productCode"]')?.value||'').toUpperCase();
  const found=byCode.get(existing)||byTechnical.get(existing)||byShort.get(existing)||byEFPPL.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
@@ -185,7 +185,7 @@ function bindSimple(form){
  const wrapper=document.createElement('label');
  wrapper.textContent='Main Heading — AFX Product Code';
  const select=document.createElement('select');select.style.cssText='display:block;width:100%;padding:12px';
- select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code+' · '+x.name)+'</option>').join('');
+ select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code)+'</option>').join('');
  const code=document.createElement('input');code.type='hidden';code.name='productCode';
  const num=document.createElement('input');num.type='hidden';num.name='itemNo';
  select.onchange=()=>{const x=byCode.get(select.value);code.value=x?.code||'';num.value=x?.itemNo||'';if(x&&!input.value.trim())input.value=x.name;};
