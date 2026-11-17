@@ -268,6 +268,26 @@ function salesOrderValidation(form){
  if(!anyProduct)errors.push('Product Name, Quantity, HSN और Rate भरें');
  return {errors,fields};
 }
+function reconstructSalesOrder(form,number){
+ // Some legacy handlers write a cloned ERP snapshot BEFORE adding the order
+ // to db.salesOrders. If quota is exceeded there, recover the complete form.
+ const record=Object.fromEntries(new FormData(form));
+ const keys=['description','moc','size','hsn','qty','unit','rate','discount'];
+ record.items=[...form.querySelectorAll('.axDocLine')].map(row=>{
+  const line={};
+  for(const key of keys){
+   const field=row.querySelector('[data-field="'+key+'"]');
+   const value=field?.value??'';
+   line[key]=['qty','rate','discount'].includes(key)?Number(value):value;
+  }
+  return line;
+ }).filter(x=>text(x.description)&&x.qty>0);
+ if(!record.items.length||getNo(record)!==number)throw Error('Order form incomplete. Nothing uploaded.');
+ const taxes=window.axHSNApplyLines(record.items,record.taxType);
+ if(!taxes?.ok)throw Error(taxes?.error||'HSN and GST validation failed.');
+ Object.assign(record,taxes);
+ return record;
+}
 function bind(form){
  if(form?.id!=='axDocForm'||form.dataset.axSOCSbound==='1')return;
  const h=document.querySelector('#modalBody > h2');
@@ -327,7 +347,13 @@ function bind(form){
    // rejected the write. Preserve it outside localStorage and upload ONLY this
    // order using cloud's latest snapshot with atomic updated_at matching.
    const quota=error?.name==='QuotaExceededError'||/quota|storage full|setItem/i.test(text(error?.message||error));
-   const pending=Array.isArray(db?.salesOrders)?db.salesOrders.find(x=>getNo(x)===no&&!before.includes(x)):null;
+   let pending=Array.isArray(db?.salesOrders)?db.salesOrders.find(x=>getNo(x)===no&&!before.includes(x)):null;
+   if(quota&&!pending&&!before.some(x=>getNo(x)===no)){
+    try{pending=reconstructSalesOrder(form,no)}
+    catch(rebuildError){
+     showState('✕ PHONE STORAGE FULL — Order not uploaded: '+text(rebuildError?.message||rebuildError)+'. Keep the form open and download an ERP backup.','error',null);
+    }
+   }
    if(quota&&pending){
     db.salesOrders=before; // do not claim the phone's original storage was changed
     mostRecentUnsaved=pending;
