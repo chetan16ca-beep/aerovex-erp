@@ -54,7 +54,7 @@ async function getEmergencyOrders(){
  return new Promise(resolve=>{
   if(!window.indexedDB)return resolve([]);
   const r=indexedDB.open('aerovex-sales-emergency-v1',1);
-  r.onupgradeneeded=()=>{};
+  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('orders'))d.createObjectStore('orders',{keyPath:'documentNo'})};
   r.onerror=()=>resolve([]);
   r.onsuccess=()=>{
    const d=r.result;
