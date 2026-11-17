@@ -235,6 +235,8 @@ function master(searchTerm=''){
  };
 }
 window.axCustomerMaster=()=>{editing=null;master();axImportCloudCustomers(false)};
+// Owner login refreshes missing Customer Master entries without a manual button.
+window.addEventListener('ax-aerovex-owner-ready',()=>axImportCloudCustomers(false));
 window.axCustomerSyncBills=syncBills;
 const prior=window.openModule;
 window.openModule=function(name){if(name==='Customer Master'||name==='Party Master')return window.axCustomerMaster();return prior.apply(this,arguments)};
