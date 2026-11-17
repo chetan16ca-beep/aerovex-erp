@@ -36,7 +36,7 @@ function itemTable(x,hideCommercial=false){
   const base=amount(z.taxable??z.amount);
   const line=base!==null?money(base):q!==null&&r!==null?money(q*r*(1-d/100)):'Not recorded';
   return '<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td><b>'+esc(get(z,'description','name')||'Description not recorded')+'</b>'+
-  '<small>'+[['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
+  '<small>'+[['AFX CODE',z.productCode||window.axAFXCodeMaster?.resolve?.(z)?.code],['ITEM NO',z.itemNo||window.axAFXCodeMaster?.resolve?.(z)?.itemNo],['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
   '<td>'+esc(get(z,'hsn')||get(x,'hsn')||'—')+'</td><td>'+esc(z.qty??'—')+'</td><td>'+esc(get(z,'unit')||get(x,'unit')||'—')+'</td>'+
   (hideCommercial?'':'<td>'+numberFormat(z.rate)+'</td><td>'+line+'</td>')+'</tr>';
  }).join('');
