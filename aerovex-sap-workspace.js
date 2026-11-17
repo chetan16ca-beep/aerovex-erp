@@ -76,9 +76,16 @@ function printBody(type,rec,i){
  '<div class="axSAPEnd"><div class="axSAPVerify">'+(hideCommercial?'Please verify the saved items, quantities and delivery address before issue.':'Values are displayed from the saved ERP document. Verify HSN, GST and addresses before issuing.')+'</div><div class="axSAPSign"><b>For AEROVEX FILTRATION</b><div class="axSAPSignSpace"></div><span>Authorized Signatory</span></div></div></article>';
 }
 let active=null;
+function quotationBlocked(type,entry){
+ if(type!=='quotation'||!entry)return false;
+ const num=String(entry.quotationNo||entry.documentNo||'').trim().toUpperCase();
+ const reserved=(db.reservedDocumentNumbers||[]).map(x=>String(x).trim().toUpperCase());
+ return entry.voided===true||entry.voided==='true'||String(entry.status||'').toUpperCase()==='VOID'||reserved.includes(num);
+}
 function preview(type,index){
  const key=group(type),entry=Array.isArray(db[key])?db[key][index]:null;
  if(!entry)return alert('Saved '+docLabel(type)+' record not available.');
+ if(quotationBlocked(type,entry))return alert('BLOCKED: Quotation '+identifier(entry,type,index)+' uses a VOID / RESERVED number. Do not issue it. Back up and reissue under a new number after review.');
  active={type,index};
  const markup=printBody(type,entry,index);
  const workflows=type==='deliveryChallan'?'<button type="button" id="axSAPFromChallan">Create Bill / Tax Invoice</button>':type==='salesOrder'?'<button type="button" id="axSAPFromSOChallan">Create Delivery Challan</button> <button type="button" id="axSAPFromSOInvoice">Create Tax Invoice</button>':'';
@@ -107,6 +114,7 @@ function printCopies(type,record,index){
 function print(){
  if(!active)return;
  const x=db[group(active.type)]?.[active.index];if(!x)return alert('Saved record not found.');
+ if(quotationBlocked(active.type,x))return alert('BLOCKED: Quotation number is VOID / RESERVED. PDF print cancelled. Reissue only after review.');
  const uri=new URL('aerovex-sap-documents.css?v=3',document.baseURI).href;
  const no=identifier(x,active.type,active.index);
  const printable=printCopies(active.type,x,active.index);
