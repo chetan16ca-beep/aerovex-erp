@@ -34,17 +34,19 @@ const rows=[
 [6000,'Sparkler Filter Cloth Pad','AFX-SFP-19X43','Sparkler Filter Cloth Pad 19" x 43"'],
 [6001,'Sparkler Filter Cloth Pad','AFX-SFP-15X43','Sparkler Filter Cloth Pad 15" x 43"'],
 [6002,'Sparkler Filter Cloth Pad','AFX-SFP-25X55','Sparkler Filter Cloth Pad 25" x 55"']
-].map(([itemNo,category,code,name])=>Object.freeze({itemNo:String(itemNo),category,code,name,description:name,productCode:code,productName:name,source:'Aerovex approved 29-item AFX product code master'}));
+].map(([itemNo,category,legacyCode,name])=>Object.freeze({itemNo:String(itemNo),itemCode:String(itemNo),category,code:'AFX-'+String(itemNo),technicalCode:legacyCode,legacyCode,name,description:name,productCode:'AFX-'+String(itemNo),productName:name,source:'Aerovex approved 29-item AFX product code master'}));
 const norm=v=>String(v??'').toUpperCase().trim().replace(/[×]/g,'X').replace(/["'″]/g,'').replace(/[^A-Z0-9]+/g,' ');
 const compact=v=>norm(v).replace(/\s+/g,'');
 const html=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byCode=new Map(rows.map(x=>[x.code,x]));
+const byTechnical=new Map(rows.map(x=>[x.technicalCode,x]));
 const byItem=new Map(rows.map(x=>[x.itemNo,x]));
 const byName=new Map(rows.map(x=>[compact(x.name),x]));
 function resolve(value){
  const item=typeof value==='string'?{description:value}:value||{};
  const code=String(item.productCode||item.code||'').trim().toUpperCase();
  if(byCode.has(code))return byCode.get(code);
+ if(byTechnical.has(code))return byTechnical.get(code);
  const itemNo=String(item.itemNo||item.itemCode||'').trim();
  if(byItem.has(itemNo))return byItem.get(itemNo);
  const desc=String(item.description||item.productName||item.name||'').trim();
@@ -52,12 +54,12 @@ function resolve(value){
  const all=norm(desc+' '+size),flat=compact(desc+' '+size),name=compact(desc);
  if(byName.has(name))return byName.get(name);
  const literal=desc.toUpperCase().match(/AFX-(?:FBD|CF|FPC|ANFD|SFP|RNF|SNF|BFB|CAN|PNFB)[A-Z0-9-]*/);
- if(literal&&byCode.has(literal[0]))return byCode.get(literal[0]);
+ if(literal&&byTechnical.has(literal[0]))return byTechnical.get(literal[0]);
  const lookupSize=values=>values.find(z=>flat.includes(z))||'';
  if(/\bFBD\b|\bFINGER\b/.test(all)){
   const finger=lookupSize(['19FINGER','37FINGER','31FINGER','12FINGER','8FINGER','08FINGER']);
   const digits=finger.replace('FINGER','').padStart(2,'0');
-  const row=rows.find(x=>x.code.startsWith('AFX-FBD-')&&x.code.split('-').pop().replace(/^0+/,'')===String(Number(digits)));
+  const row=rows.find(x=>x.technicalCode.startsWith('AFX-FBD-')&&x.technicalCode.split('-').pop().replace(/^0+/,'')===String(Number(digits)));
   if(row)return row;
  }
  if(/\bCF\b|\bCENTRIFUGE\b/.test(all)){
@@ -66,26 +68,26 @@ function resolve(value){
   const ordinary=/\bORDINARY\b|\bORD\b/i.test(desc);
   if(sz&&(top!==ordinary)){
    const code='AFX-CF-'+sz+'-'+(top?'TLT':'ORD');
-   return byCode.get(code)||null;
+   return byTechnical.get(code)||null;
   }
  }
  if(/\bFILTER\b.*\bPRESS\b|\bFPC\b/.test(all)){
   const sz=lookupSize(['26X30','38X42','52X54','62X64']);
-  if(sz)return byCode.get('AFX-FPC-'+sz)||null;
+  if(sz)return byTechnical.get('AFX-FPC-'+sz)||null;
  }
  if(/\bSPARKLER\b|\bSFP\b/.test(all)){
   const sz=lookupSize(['19X43','15X43','25X55']);
-  if(sz)return byCode.get('AFX-SFP-'+sz)||null;
+  if(sz)return byTechnical.get('AFX-SFP-'+sz)||null;
  }
  if(/\bANFD\b|\bANF\b/.test(all)){
-  if(/DUST\s*COLLECTOR|\bDC\b/i.test(desc))return byCode.get('AFX-ANFD-DC');
-  if(/FILTER\s*CLOTH/i.test(desc))return byCode.get('AFX-ANFD-FC');
+  if(/DUST\s*COLLECTOR|\bDC\b/i.test(desc))return byTechnical.get('AFX-ANFD-DC');
+  if(/FILTER\s*CLOTH/i.test(desc))return byTechnical.get('AFX-ANFD-FC');
  }
- if(/\bRNF\b/.test(all))return byCode.get('AFX-RNF');
- if(/\bSNF\b/.test(all))return byCode.get('AFX-SNF');
- if(/\bBASKET\b/.test(all))return byCode.get('AFX-BFB');
- if(/\bCANDLE\b/.test(all))return byCode.get('AFX-CAN');
- if(/\bPRESSURE\b.*\bNUTCH\b|\bPNFB\b/.test(all))return byCode.get('AFX-PNFB');
+ if(/\bRNF\b/.test(all))return byTechnical.get('AFX-RNF');
+ if(/\bSNF\b/.test(all))return byTechnical.get('AFX-SNF');
+ if(/\bBASKET\b/.test(all))return byTechnical.get('AFX-BFB');
+ if(/\bCANDLE\b/.test(all))return byTechnical.get('AFX-CAN');
+ if(/\bPRESSURE\b.*\bNUTCH\b|\bPNFB\b/.test(all))return byTechnical.get('AFX-PNFB');
  return null; // ambiguous product remains UNCODED, never guess
 }
 function enrich(item){
@@ -155,7 +157,7 @@ function bindRow(row){
   rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.itemNo+' · '+x.code+' · '+x.name)+'</option>').join('');
  label.appendChild(select);
  const existing=String(row.querySelector('[data-field="productCode"],[data-k="productCode"],[data-bill-field="productCode"],[data-key="productCode"]')?.value||'').toUpperCase();
- const found=byCode.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
+ const found=byCode.get(existing)||byTechnical.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
  if(found)select.value=found.code;
  select.onchange=()=>{
   const selected=byCode.get(select.value);
@@ -192,7 +194,7 @@ function bind(){
  modal.querySelectorAll('form').forEach(bindSimple);
 }
 function renderMaster(){
- const extras=(Array.isArray(db.products)?db.products:[]).filter(x=>!byCode.has(String(x.code||x.productCode||'').toUpperCase()));
+ const extras=(Array.isArray(db.products)?db.products:[]).filter(x=>{const code=String(x.code||x.productCode||'').toUpperCase();return !byCode.has(code)&&!byTechnical.has(code)});
  const content='<section style="font:13px Arial;max-width:100%;overflow:auto">'+
  '<h3>AEROVEX FILTRATION — AFX Product Code Master</h3>'+
  '<p>29 approved products • Item Number + AFX Code • Same sequence as CFM. Rates, GST and historical invoices are not changed.</p>'+
