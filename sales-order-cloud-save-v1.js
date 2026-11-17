@@ -168,11 +168,50 @@ async function inspectOrders(node){
   node.textContent='⚠ Could not compare orders: '+text(e?.message||e)+'. Local ERP data unchanged.';
  }
 }
+function salesOrderValidation(form){
+ const errors=[], fields=[];
+ const requireField=(key,message)=>{
+  const el=form.elements?.namedItem(key);
+  if(!el||!text(el.value)){errors.push(message);if(el)fields.push(el)}
+ };
+ requireField('party','Customer select करें');
+ requireField('documentNo','Sales Order Number खाली है');
+ const rows=[...form.querySelectorAll('.axDocLine')];
+ if(!rows.length){errors.push('कम से कम 1 Product जोड़ें');return {errors,fields}}
+ let anyProduct=false;
+ rows.forEach((row,i)=>{
+  const el=k=>row.querySelector('[data-field="'+k+'"]');
+  const desc=el('description'),qty=el('qty'),hsn=el('hsn'),rate=el('rate');
+  const d=text(desc?.value),q=text(qty?.value),h=text(hsn?.value),r=text(rate?.value);
+  if(!d&&!q&&!h&&!r)return; // completely blank spare line
+  anyProduct=true;
+  if(!d){errors.push('Item '+(i+1)+': Product Name भरें');if(desc)fields.push(desc)}
+  if(!q||!(Number(q)>0)){errors.push('Item '+(i+1)+': Quantity 0 से ज्यादा भरें');if(qty)fields.push(qty)}
+  if(!/^\d{4}(\d{2})?(\d{2})?$/.test(h)){
+   errors.push('Item '+(i+1)+': सही 4, 6 या 8 digit HSN भरें');
+   if(hsn)fields.push(hsn);
+  }else if(typeof window.axHSNLookup==='function'&&!window.axHSNLookup(h)){
+   errors.push('Item '+(i+1)+': HSN '+h+' GST Master में नहीं है');
+   if(hsn)fields.push(hsn);
+  }
+  if(r===''||!Number.isFinite(Number(r))||Number(r)<0){
+   errors.push('Item '+(i+1)+': Rate भरें (free item हो तो 0 लिखें)');
+   if(rate)fields.push(rate);
+  }
+ });
+ if(!anyProduct)errors.push('Product Name, Quantity, HSN और Rate भरें');
+ return {errors,fields};
+}
 function bind(form){
  if(form?.id!=='axDocForm'||form.dataset.axSOCSbound==='1')return;
  const h=document.querySelector('#modalBody > h2');
  if(!h||text(h.textContent).toUpperCase()!=='SALES ORDER')return;
  form.dataset.axSOCSbound='1';
+ // Native required-field checks happen before submit; keep the error visible.
+ form.addEventListener('invalid',event=>{
+  const field=event.target;
+  showState('✕ SALES ORDER NOT SAVED — '+(field?.name||'Required field')+' जरूरी है. Customer, Date और Order No. भरें.','error',null);
+ },true);
  const audit=document.createElement('div');
  audit.className='axSOCloudAudit';
  audit.style.cssText='padding:10px;margin:9px 0;background:#f6fafc;border:1px solid #c7dbe3;border-radius:9px';
@@ -191,6 +230,13 @@ function bind(form){
  const prior=form.onsubmit;
  if(typeof prior!=='function')return;
  form.onsubmit=function(event){
+  event?.preventDefault?.();
+  const check=salesOrderValidation(form);
+  if(check.errors.length){
+   showState('✕ SALES ORDER NOT SAVED — '+check.errors.join(' | ')+'. ये details भरकर Save दबाएँ.','error',null);
+   check.fields[0]?.focus?.({preventScroll:false});
+   return false;
+  }
   const no=text(form.elements?.namedItem('documentNo')?.value);
   const entries=Array.isArray(db?.salesOrders)?db.salesOrders:[];
   const before=entries.slice();
