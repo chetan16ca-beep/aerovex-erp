@@ -57,18 +57,18 @@ function stop(reason){paused=true;online=false;clearInterval(timer);timer=null;s
 function modalIsOpen(){const m=$('modal');return m&&!m.classList.contains('hidden')}
 function isLocked(){return document.body?.classList.contains('axAuthLocked')}
 function setCurrent(payload){
-  const previous=localStorage.getItem(LOCAL)||'{}';
-  // Retain a same-device rollback. If out of space, don't apply the remote snapshot.
-  localStorage.setItem('aerovex-sync-prechange-v3',previous);
-  try{
-    localStorage.setItem(LOCAL,JSON.stringify(payload));
-    if(typeof db!=='undefined'&&db&&typeof db==='object'){
-      const safe=typeof blank==='function'?Object.assign(blank(),payload):payload;
-      for(const k of Object.keys(db))delete db[k];
-      Object.assign(db,safe);
-      if(typeof render==='function')render();
-    }
-  }catch(e){localStorage.setItem(LOCAL,previous);throw e}
+  // The previous value remains intact if a localStorage setItem exceeds quota.
+  // Avoid keeping a SECOND full-sized ERP JSON in the small localStorage quota.
+  // User-initiated full backups and verified IndexedDB archives remain available.
+  const serialized=JSON.stringify(payload);
+  try{localStorage.setItem(LOCAL,serialized)}
+  catch(e){throw Error('Phone browser storage is full; existing ERP data is intact. Open Storage Repair / Backup. '+(e?.message||e))}
+  if(typeof db!=='undefined'&&db&&typeof db==='object'){
+    const safe=typeof blank==='function'?Object.assign(blank(),payload):payload;
+    for(const k of Object.keys(db))delete db[k];
+    Object.assign(db,safe);
+    if(typeof render==='function')render();
+  }
 }
 function id(k,x){
   if(!x||typeof x!=='object')return stable(x);
