@@ -68,7 +68,7 @@ function create(){
  const numbers=nextNumbers(selected.length),today=new Date().toLocaleDateString('en-CA');
  const newWorks=selected.map((entry,j)=>{
   const x=lines(order)[entry.i];
-  const item={description:String(x.description||''),size:String(x.size||''),cloth:String(x.cloth||''),width:String(x.width||''),srl:String(x.srl||''),qty:entry.qty,cutQty:0,moc:String(x.moc||''),micron:String(x.micron||''),hsn:String(x.hsn||''),unit:String(x.unit||'Nos'),productCode:String(x.productCode||window.axAFXCodeMaster?.resolve?.(x)?.code||''),itemNo:String(x.itemNo||window.axAFXCodeMaster?.resolve?.(x)?.itemNo||'')};
+  const item={description:String(x.description||''),size:String(x.size||''),cloth:String(x.cloth||''),width:String(x.width||''),srl:String(x.srl||''),qty:entry.qty,cutQty:0,moc:String(x.moc||''),micron:String(x.micron||''),hsn:String(x.hsn||''),unit:String(x.unit||'Nos'),productCode:String(window.axAFXCodeMaster?.resolve?.(x)?.code||x.productCode||''),itemNo:String(x.itemNo||window.axAFXCodeMaster?.resolve?.(x)?.itemNo||'')};
   return {workNo:numbers[j],party:order.party||'',po:order.poRef||order.ref||id(order),date:today,priority:document.getElementById('axSOWOPriority')?.value||'Normal',remark:'From '+id(order),description:item.description,items:[item],qty:entry.qty,done:0,status:'Open',sourceSalesOrder:id(order),sourceSalesOrderIndex:chosen,sourceLine:entry.i,sourceSalesOrderLine:entry.i};
  });
  if(newWorks.some(w=>!w.description.trim()))return alert('Sales Order product description is required.');
