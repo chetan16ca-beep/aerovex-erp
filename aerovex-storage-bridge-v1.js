@@ -11,7 +11,7 @@ const DB_NAME='aerovex-durable-data-v1',STORE='records';
 const PERSISTED=new Map(),REV=new Map();
 let db=null,ready=false,fallback=false,lastError='',pending=0;
 let chain=Promise.resolve(),migration=null,original=Object.create(null);
-const managed=k=>k===DATA_KEY||k==='aerovex-logo-data'||
+const managed=k=>k===DATA_KEY||k==='aerovex-logo-data'||k==='aerovex-previous-mobile-logo-v1'||
   k==='aerovex-erp-prechange-v30'||k==='aerovex-gst-itc-prechange-v2'||
   k==='aerovex-sync-prechange-v3'||k==='aerovex-sync-baseline-v1'||k==='aerovex-sync-paired-role-v1'||/^aerovex-previous-cloud-/.test(k);
 const get=Storage.prototype.getItem,set=Storage.prototype.setItem,remove=Storage.prototype.removeItem;
