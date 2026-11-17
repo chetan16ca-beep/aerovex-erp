@@ -41,7 +41,7 @@ function itemTable(x,hideCommercial=false){
   return '<tr><td>'+String((i+1)*10).padStart(4,'0')+'</td><td>'+
   '<strong class="axSAPProductHeading" style="display:block;font-size:13px;color:#0b4961">'+esc(heading||description)+'</strong>'+
   (heading?'<div style="margin-top:5px"><b>Description:</b> '+esc(description)+'</div>':'')+
-  '<small>'+[['ITEM NO',z.itemNo||window.axAFXCodeMaster?.resolve?.(z)?.itemNo],['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
+  '<small>'+[['MOC',z.moc],['MICRON',z.micron],['SIZE',z.size]].filter(v=>s(v[1])).map(v=>esc(v[0])+': '+esc(v[1])).join(' / ')+'</small></td>'+
   '<td>'+esc(get(z,'hsn')||get(x,'hsn')||'—')+'</td><td>'+esc(z.qty??'—')+'</td><td>'+esc(get(z,'unit')||get(x,'unit')||'—')+'</td>'+
   (hideCommercial?'':'<td>'+numberFormat(z.rate)+'</td><td>'+line+'</td>')+'</tr>';
  }).join('');
