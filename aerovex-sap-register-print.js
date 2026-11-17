@@ -16,7 +16,7 @@ const m=v=>v===undefined||v===null||v===''||!Number.isFinite(Number(v))?'—':'�
 const k=v=>al[v]||v;
 const ref=x=>t(x.documentNo||x.invoiceNo||x.quotationNo||x.orderNo||x.challanNo||x.poNo||x.workNo||x.srl||x.no||x.code||x.id||'—');
 const products=x=>Array.isArray(x.items)&&x.items.length?x.items:[x];
-const desc=(x,key)=>key==='store'?[x.cloth&&'Cloth '+x.cloth,x.width&&'Width '+x.width,x.srl&&'SRL '+x.srl].filter(Boolean).join(' / '):products(x).map(z=>{const match=window.axAFXCodeMaster?.resolve?.(z);return [(z.productCode||match?.code||''),z.description||z.name||z.product||z.cloth||'',z.moc||'',z.size||''].filter(Boolean).join(' / ')}).filter(Boolean).join(' | ');
+const desc=(x,key)=>key==='store'?[x.cloth&&'Cloth '+x.cloth,x.width&&'Width '+x.width,x.srl&&'SRL '+x.srl].filter(Boolean).join(' / '):products(x).map(z=>{const match=window.axAFXCodeMaster?.resolve?.(z);return [(match?.code||z.productCode||''),z.description||z.name||z.product||z.cloth||'',z.moc||'',z.size||''].filter(Boolean).join(' / ')}).filter(Boolean).join(' | ');
 const qty=(x,key)=>key==='store'?(x.balance??x.opening??'—')+' m':key==='workOrders'?'Order '+(x.qty??x.orderQty??'—')+' | Done '+(x.done??x.doneQty??'—'):products(x).map(z=>t(z.qty??z.quantity??'—')+' '+t(z.unit||'')).join(' / ');
 const logo=()=>{const x=window.axSAPLogoFix?.current?.()||localStorage.getItem('aerovex-logo-data')||'';return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x)?'<img src="'+E(x)+'" alt="Aerovex Filtration" class="axSapRegLogo">':''};
 function printRegister(key,ttl,onlyIndex=null){
