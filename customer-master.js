@@ -75,12 +75,24 @@ function list(){
 }
 function fill(form,selected,overwrite=true){
  const data=customer(all()[selected]);if(!data.name)return;
- for(const k of ['name','gstin','address','attention','place','phone','email']){
-  const target=form.elements?.namedItem(k==='name'?'party':k);
-  if(target&&data[k]&&(overwrite||!clean(target.value))){
-   target.value=data[k];target.dispatchEvent(new Event('change',{bubbles:true}));
+ // Map the saved customer into BOTH legacy and SAP-style Sales Order fields.
+ // Ship To is intentionally not invented from Bill To.
+ const values={
+  party:data.name,gstin:data.gstin,address:data.address,attention:data.attention,
+  place:data.place,phone:data.phone,email:data.email,
+  billToName:data.name,billToAddress:data.address,billToGstin:data.gstin,
+  billToContact:data.attention||data.phone
+ };
+ form.dataset.axCustomerFilling='1';
+ try{
+  for(const [k,value] of Object.entries(values)){
+   const target=form.elements?.namedItem(k);
+   if(target&&value&&(overwrite||!clean(target.value))){
+    target.value=value;
+    target.dispatchEvent(new Event('input',{bubbles:true}));
+   }
   }
- }
+ }finally{delete form.dataset.axCustomerFilling}
 }
 function bind(form){
  if(form.dataset.axCustomerBound||form.id==='axCustomerMasterForm'||form.id==='axEditSavedForm')return;
@@ -91,6 +103,13 @@ function bind(form){
  form.dataset.axCustomerBound='1';
  const parent=input.closest('label')||input.parentNode;
  if(!parent)return;
+ // Sales Order should capture the saved customer's phone as a separate field.
+ if(form.id==='axDocForm'&&/SALES ORDER/.test(title)&&!form.elements.namedItem('phone')){
+  const phone=document.createElement('label');
+  phone.textContent='Customer Mobile (from Master)';
+  const box=document.createElement('input');box.name='phone';box.type='tel';box.autocomplete='off';
+  phone.appendChild(box);parent.after(phone);
+ }
  // The older Tally invoice form had no address field; add it before customer selection.
  if(form.id==='inv'&&!form.elements.namedItem('address')){
   const address=document.createElement('label');
@@ -108,19 +127,44 @@ function bind(form){
   list().map(x=>'<option value="'+x.i+'">'+E(x.name)+(x.gstin?' — '+E(x.gstin):'')+'</option>').join('');
  select.innerHTML=options();
  label.appendChild(select);parent.before(label);
- select.addEventListener('change',()=>{if(select.value!=='')fill(form,Number(select.value))});
+ select.addEventListener('change',()=>{if(select.value!=='')fill(form,Number(select.value),true)});
  input.addEventListener('change',()=>{
+  if(form.dataset.axCustomerFilling==='1')return;
   const c=list().find(x=>norm(x.name)===norm(input.value));
-  if(c){select.value=String(c.i);fill(form,c.i,false)}
+  if(c){select.value=String(c.i);fill(form,c.i,true)}
   else select.value='';
  });
  const current=list().find(x=>norm(x.name)===norm(input.value));
  if(current)select.value=String(current.i);
+ if(form.id==='axDocForm'&&/SALES ORDER/.test(title)&&!form.querySelector('.axSalesPartyRefresh')){
+  const line=document.createElement('div');line.className='axSalesPartyRefresh full';
+  const button=document.createElement('button');button.type='button';button.textContent='↻ Refresh Customers from Aerovex Cloud';
+  const status=document.createElement('small');status.id='axSalesPartyStatus';status.setAttribute('role','status');
+  line.appendChild(button);line.appendChild(status);label.after(line);
+  button.onclick=()=>axImportCloudCustomers(true);
+ }
 }
 function bindCurrent(){
  const root=document.getElementById('modalBody');
  if(!root)return;
  for(const form of root.querySelectorAll('form'))bind(form);
+}
+function refreshCustomerFormOptions(){
+ const root=document.getElementById('modalBody');
+ if(!root)return;
+ for(const form of root.querySelectorAll('form')){
+  const select=form.querySelector('.axCustomerSelect'),input=form.elements?.namedItem('party');
+  if(!select||!input)continue;
+  const current=list().find(x=>norm(x.name)===norm(input.value));
+  select.innerHTML='<option value="">Select customer / type new customer below</option>'+
+    list().map(x=>'<option value="'+x.i+'">'+E(x.name)+(x.gstin?' — '+E(x.gstin):'')+'</option>').join('');
+  if(current){
+   select.value=String(current.i);
+   fill(form,current.i,false);
+  }
+  const datalistId=input.getAttribute('list'),dl=datalistId?document.getElementById(datalistId):null;
+  if(dl)dl.innerHTML=list().map(x=>'<option value="'+E(x.name)+'"></option>').join('');
+ }
 }
 const css=document.createElement('style');
 css.textContent='.axCustomerPicker{display:block;padding:8px;border:1px solid #c7dfe5;background:#eff8fb;border-radius:10px;color:#124d61;font-weight:700}.axCustomerPicker select{display:block;width:100%;margin-top:8px;min-height:42px}.axCustomerRow{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dde7ed;background:white;border-radius:9px;padding:10px;margin:7px 0;flex-wrap:wrap}.axCustomerRow small{color:#556f80;display:block}.axCustomerMasterTools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}';
@@ -133,7 +177,7 @@ let axCloudCustomerImportBusy=false;
 async function axImportCloudCustomers(manual=false){
  if(axCloudCustomerImportBusy)return;
  const currentStatus=()=>document.getElementById('axCloudCustomerStatus');
- const report=msg=>{const x=currentStatus();if(x)x.textContent=msg};
+ const report=msg=>{for(const x of [currentStatus(),document.getElementById('axSalesPartyStatus')])if(x)x.textContent=msg};
  let session=null;
  try{session=JSON.parse(sessionStorage.getItem('ax-erp-owner-session-v1')||'null')}catch(e){}
  if(!session?.access_token){if(manual)report('Please log in as Aerovex owner, then retry. Local customers unchanged.');return}
@@ -177,6 +221,9 @@ async function axImportCloudCustomers(manual=false){
     throw Error('Phone storage could not save imported customers. Original customer list restored.');
    }
   }
+  // Existing Sales Order forms and autocomplete lists update in place,
+  // so the customer form and typed item lines are never discarded.
+  refreshCustomerFormOptions();
   const summary=(added||filled?'✓ '+added+' new cloud customer(s) imported, '+filled+' completed.':'✓ Customer Master already matches cloud.')+
     (conflicts?' '+conflicts+' conflicting record(s) skipped safely.':'');
   if(document.getElementById('axCustomerMasterForm')){
