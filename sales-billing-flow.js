@@ -100,7 +100,7 @@ function rowsHtml(source,index,kind){
  let html=problems.map(x=>'<p class="axFlowError">'+esc(x)+'</p>').join('');
  if(!rows.length)html+='<p class="axFlowError">This document has no saved product lines. Open and correct the original document before converting.</p>';
  if(rows.length&&!pending.length)html+='<p>All quantities already converted. No pending quantity to process.</p>';
- html+=pending.map(r=>'<div class="axFlowLine"><div><b>'+esc(r.item.description||'Unnamed product')+'</b><small>'+esc(r.item.size||'')+' · HSN '+esc(r.item.hsn||'Not entered')+' · Pending '+amount(r.pending)+' '+esc(r.item.unit||'Nos')+' (Original '+amount(r.ordered)+', converted '+amount(r.used)+')</small></div><div><label>Qty<input class="axFlowQty" type="number" min="0" max="'+r.pending+'" step="any" value="'+r.pending+'" data-line="'+r.j+'"></label></div></div>').join('');
+ html+=pending.map(r=>'<div class="axFlowLine"><div><b>'+esc(window.axAFXCodeMaster?.resolve?.(r.item)?.code||r.item.productCode||'CUSTOM ITEM')+'</b><small style="white-space:pre-wrap"><b>Description / Specifications:</b> '+esc(r.item.description||'Not recorded')+'</small><small>'+esc(r.item.size||'')+' · HSN '+esc(r.item.hsn||'Not entered')+' · Pending '+amount(r.pending)+' '+esc(r.item.unit||'Nos')+' (Original '+amount(r.ordered)+', converted '+amount(r.used)+')</small></div><div><label>Qty<input class="axFlowQty" type="number" min="0" max="'+r.pending+'" step="any" value="'+r.pending+'" data-line="'+r.j+'"></label></div></div>').join('');
  return {html,pending,problems};
 }
 function renderOrder(){
