@@ -144,6 +144,28 @@ function attach(){
    if(!Array.isArray(found)||!Array.isArray(found[0]?.payload?.parties))
     throw Error('Cloud Customer Master not available.');
    if(!form.isConnected)return;
+   // Safely avoid a duplicate SO number on a phone that has fewer orders
+   // than the Cloud. Never replace a manually edited document number.
+   const numberInput=form.elements.namedItem('documentNo');
+   const initialNo=clean(numberInput?.value);
+   if(numberInput&&!form.dataset.axFirstSuggestedSO)form.dataset.axFirstSuggestedSO=initialNo;
+   const cloudOrders=Array.isArray(found[0]?.payload?.salesOrders)?found[0].payload.salesOrders:[];
+   const deviceOrders=Array.isArray(db?.salesOrders)?db.salesOrders:[];
+   const allNumbers=[...cloudOrders,...deviceOrders].map(x=>clean(x?.documentNo||x?.orderNo||x?.no));
+   const used=new Set(allNumbers);
+   if(numberInput&&initialNo===form.dataset.axFirstSuggestedSO&&used.has(initialNo)){
+    const numbers=allNumbers.map(n=>/^AFX\/SO\/(\d+)$/i.exec(n)).filter(Boolean).map(m=>Number(m[1]));
+    let next=Math.max(0,...numbers)+1;
+    let candidate='AFX/SO/'+String(next).padStart(3,'0');
+    while(used.has(candidate)){next++;candidate='AFX/SO/'+String(next).padStart(3,'0')}
+    numberInput.value=candidate;
+    form.dataset.axFirstSuggestedSO=candidate;
+    const notice=document.getElementById('axSOCloudNumberNotice')||document.createElement('p');
+    notice.id='axSOCloudNumberNotice';
+    notice.setAttribute('role','status');
+    notice.textContent='✓ Cloud order numbers checked. New Sales Order number: '+candidate+' (previous number already exists).';
+    if(!notice.isConnected)numberInput.closest('label')?.after(notice);
+   }
    const rawProducts=Array.isArray(found[0]?.payload?.products)?found[0].payload.products:[];
    productList=[];
    const seenProducts=new Set();
