@@ -215,7 +215,7 @@ function showReview(info){
 function readItems(){
  return [...document.querySelectorAll('#axOCRLines .axOCRLine')].map(line=>{
   const read=k=>line.querySelector('[data-bill-field="'+k+'"]')?.value||'';
-  return {description:tidy(read('description')),hsn:read('hsn').replace(/\D/g,''),qty:read('qty'),unit:tidy(read('unit'))||'Nos',rate:read('rate'),discount:read('discount')||0,gstRate:read('gstRate')};
+  const item={description:tidy(read('description')),hsn:read('hsn').replace(/\D/g,''),qty:read('qty'),unit:tidy(read('unit'))||'Nos',rate:read('rate'),discount:read('discount')||0,gstRate:read('gstRate'),productCode:tidy(read('productCode')),itemNo:tidy(read('itemNo'))};return window.axAFXCodeMaster?.enrich?.(item)||item;
  });
 }
 function taxFrom(form){
