@@ -38,6 +38,47 @@ function attach(){
  select.setAttribute('aria-label','Live saved Aerovex customer');
  select.innerHTML='<option value="">Loading Aerovex customers…</option>';
  heading.appendChild(select);
+ // Product picker reads the same authenticated Aerovex cloud snapshot.
+ // It edits only the current Sales Order form; no rate/quantity/HSN is guessed.
+ const productBox=document.createElement('div');
+ productBox.className='axSalesLiveProduct';
+ const productLabel=document.createElement('label');
+ productLabel.textContent='Product Name — Select from Aerovex Cloud';
+ const productSelect=document.createElement('select');
+ productSelect.id='axLiveSalesProductSelect';
+ productSelect.setAttribute('aria-label','Live saved Aerovex product');
+ productSelect.innerHTML='<option value="">Loading saved products…</option>';
+ productLabel.appendChild(productSelect);
+ const productStatus=document.createElement('small');
+ productStatus.id='axLiveSalesProductStatus';
+ productStatus.setAttribute('role','status');
+ productStatus.textContent='Select product after customer.';
+ productBox.append(productLabel,productStatus);
+ const itemSection=form.querySelector('#axDocLines');
+ if(itemSection){
+  const container=itemSection.closest('.full')||itemSection.parentNode;
+  container.before(productBox);
+ }
+ let productList=[];
+ productSelect.addEventListener('change',()=>{
+  const chosen=productList[Number(productSelect.value)];
+  if(productSelect.value===''||!chosen)return;
+  let field=[...form.querySelectorAll('.axDocLine [data-field="description"]')]
+    .find(x=>!clean(x.value));
+  if(!field){
+   if(typeof window.axAddDocLine!=='function'){
+    productStatus.textContent='Add an empty product row first.';
+    return;
+   }
+   window.axAddDocLine();
+   const fields=[...form.querySelectorAll('.axDocLine [data-field="description"]')];
+   field=fields[fields.length-1];
+  }
+  if(!field)return;
+  field.value=chosen;
+  field.dispatchEvent(new Event('input',{bubbles:true}));
+  productStatus.textContent='✓ '+chosen+' added to Sales Order. Enter size, quantity, HSN and rate.';
+ });
  const message=document.createElement('p');
  message.className='axSalesLiveStatus';
  message.setAttribute('role','status');
@@ -103,6 +144,22 @@ function attach(){
    if(!Array.isArray(found)||!Array.isArray(found[0]?.payload?.parties))
     throw Error('Cloud Customer Master not available.');
    if(!form.isConnected)return;
+   const rawProducts=Array.isArray(found[0]?.payload?.products)?found[0].payload.products:[];
+   productList=[];
+   const seenProducts=new Set();
+   for(const item of rawProducts){
+    const name=clean(item?.name||item?.description||item?.productName);
+    const id=norm(name);
+    if(!id||seenProducts.has(id))continue;
+    seenProducts.add(id);
+    productList.push(name);
+   }
+   productList.sort((a,b)=>a.localeCompare(b,'en',{sensitivity:'base'}));
+   productSelect.replaceChildren(new Option('Select Product from Cloud',''));
+   productList.forEach((p,i)=>productSelect.add(new Option(p,String(i))));
+   productStatus.textContent=productList.length?
+     '✓ '+productList.length+' product(s) available. Choose FILTER PRESS for this Sales Order.':
+     'No Product Master entries found in this cloud snapshot.';
    const seen=new Set();
    rows=[];
    for(const source of found[0].payload.parties){
@@ -123,7 +180,10 @@ function attach(){
    const existing=rows.findIndex(c=>norm(c.name)===typed||c.gstin&&norm(c.gstin)===typed);
    if(existing>=0){select.value=String(existing);choose(rows[existing])}
   }catch(e){
-   if(form.isConnected)status('⚠ '+e.message+' — Existing form data kept.',true);
+   if(form.isConnected){
+    status('⚠ '+e.message+' — Existing form data kept.',true);
+    productStatus.textContent='Cloud Product Master unavailable; keep item details manually.';
+   }
   }finally{
    running=false;
    if(form.isConnected)retry.disabled=false;
@@ -139,6 +199,7 @@ function attach(){
 }
 const css=document.createElement('style');
 css.textContent='.axSalesLiveSelector{padding:12px;margin:9px 0;border:1px solid #95c7d2;border-radius:11px;background:#f2fafb;display:flex;flex-wrap:wrap;gap:8px;color:#194b5a}.axSalesLiveSelector label{flex:1 1 230px;font-weight:700}.axSalesLiveSelector select{display:block;width:100%;min-height:44px;margin-top:7px;border:1px solid #a8cad5;border-radius:8px;background:white;color:#133b4f}.axSalesLiveRetry{flex:0 1 auto;align-self:center;min-height:42px}.axSalesLiveStatus{width:100%;font-size:13px;margin:4px 0 0}#axDocForm.axSalesCloudReady .axCustomerPicker{display:none!important}';
+css.textContent+='.axSalesLiveProduct{padding:12px;margin:9px 0;border:1px solid #95c7d2;border-radius:11px;background:#f2fafb;display:flex;flex-wrap:wrap;gap:8px}.axSalesLiveProduct label{width:100%;font-weight:700}.axSalesLiveProduct select{display:block;width:100%;min-height:44px;margin-top:7px;border:1px solid #a8cad5;border-radius:8px;background:white;color:#133b4f}.axSalesLiveProduct small{font-size:13px;color:#155b49}';
 document.head.appendChild(css);
 // Works for all New Sales Order entry paths and wrapped axDetailedDocument flows.
 if(typeof window.axDetailedDocument==='function'){
