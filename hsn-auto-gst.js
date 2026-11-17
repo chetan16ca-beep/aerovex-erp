@@ -20,7 +20,7 @@ function ensure(){
  if(missing.length){db.hsnTaxMaster.push(...missing);try{save()}catch(error){console.warn('Could not seed verified HSN rates',error)}}
  if(!db.hsnTaxMaster.some(x=>code(x.hsn)==='48120000')){
   db.hsnTaxMaster.push({hsn:'48120000',rate:18,description:'Filter blocks, slabs and plates of paper pulp (verify pad classification)',source:'CBIC 09/2025-CT(R), Schedule II entry 179',verifiedOn:'2026-10-20'});
-  save();
+  try{save()}catch(error){console.warn('HSN default could not persist. Check device storage.',error)}
  }
  if(!db.hsnTaxMaster.some(x=>code(x.hsn)==='5911')){
   db.hsnTaxMaster.push({hsn:'5911',rate:5,description:'Textile products and articles for technical uses (confirm goods classification)',source:'GST Council 56th Meeting 2025 / Notification 09/2025-CT(R)',verifiedOn:'2026-10-20'});save();
