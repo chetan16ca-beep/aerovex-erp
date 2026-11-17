@@ -94,15 +94,26 @@ function preview(type,index){
  if(btn)btn.onclick=print;
  if(back)back.onclick=()=>{if(typeof closeModal==='function')closeModal()};
 }
+function printCopies(type,record,index){
+ // Paper copies are generated on demand only; no extra invoice or stock records.
+ const copies=type==='invoice'?['ORIGINAL','DUPLICATE','TRIPLICATE']:
+  type==='deliveryChallan'?['ORIGINAL','DUPLICATE']:null;
+ if(!copies)return printBody(type,record,index);
+ return copies.map((label,i)=>'<section class="axSAPPrintCopy" data-copy-index="'+(i+1)+'">'+
+  printBody(type,record,index).replace('<header class="axSAPDocumentHead">',
+    '<div class="axSAPCopyMark">'+esc(label)+'</div><header class="axSAPDocumentHead">')+
+  '</section>').join('');
+}
 function print(){
  if(!active)return;
  const x=db[group(active.type)]?.[active.index];if(!x)return alert('Saved record not found.');
- const uri=new URL('aerovex-sap-documents.css?v=2',document.baseURI).href;
+ const uri=new URL('aerovex-sap-documents.css?v=3',document.baseURI).href;
  const no=identifier(x,active.type,active.index);
+ const printable=printCopies(active.type,x,active.index);
  // Native PDF print on Android runs within the user's click, without popups.
  // It uses the existing SAP layout; Sales Order / Challan stay price-free.
  if(typeof window.axPrintSafe==='function'){
-  return window.axPrintSafe({html:printBody(active.type,x,active.index),
+  return window.axPrintSafe({html:printable,
    title:no,cssUrl:uri,landscape:false});
  }
  const w=window.open('','_blank');if(!w)return alert('Please allow popups for Print / Save PDF.');
