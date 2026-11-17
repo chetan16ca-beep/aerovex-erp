@@ -112,7 +112,7 @@ function cashView(){var i=db.receipts.reduce((a,x)=>a+n(x.amount),0),o=db.paymen
 function profitView(){var s=db.invoices.reduce((a,x)=>a+n(x.taxable),0),p=db.purchases.reduce((a,x)=>a+n(x.taxable),0),e=db.expenses.reduce((a,x)=>a+n(x.amount),0);show('Profit Report','<div class="summaryCards"><div><small>Sales</small><b>'+money(s)+'</b></div><div><small>Purchase</small><b>'+money(p)+'</b></div><div><small>Expense</small><b>'+money(e)+'</b></div><div><small>Profit View</small><b>'+money(s-p-e)+'</b></div></div>')}
 function voucherView(){show('Voucher Register',tbl(['Type','No.','Date','Party','Debit','Credit'],db.vouchers.map(x=>[x.type,x.no,x.date||'',x.party||'',money(x.debit),money(x.credit)]))+(db.vouchers.length?'':'<div class="empty">ZERO VOUCHERS</div>'))}
 function gstView(){var out=db.invoices.reduce((a,x)=>a+n(x.gst),0),inp=db.purchases.reduce((a,x)=>a+n(x.gst),0);show('GST Summary','<div class="summaryCards"><div><small>Output GST</small><b>'+money(out)+'</b></div><div><small>Input GST</small><b>'+money(inp)+'</b></div><div><small>Net GST</small><b>'+money(out-inp)+'</b></div></div>')}
-save();render();
+try{if(!localStorage.getItem(KEY))save()}catch(e){console.warn('Aerovex startup storage unavailable; no existing records changed.',e)}render();
 
 
 
