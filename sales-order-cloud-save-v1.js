@@ -45,6 +45,66 @@ function localOrder(number){
  if(matches.length!==1)throw Error(matches.length?'Duplicate Sales Order numbers on device. Do not upload until reviewed.':'Order not found in saved phone data.');
  return matches[0];
 }
+/* IndexedDB is a NON-DESTRUCTIVE emergency copy for a Sales Order when
+ * the origin's synchronous localStorage quota is exhausted. */
+function emergencyDB(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB)return reject(Error('IndexedDB not available.'));
+  const req=window.indexedDB.open('aerovex-sales-emergency-v1',1);
+  req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('orders'))d.createObjectStore('orders',{keyPath:'documentNo'})};
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error||Error('IndexedDB access failed.'));
+ });
+}
+async function emergencyWrite(order){
+ const d=await emergencyDB();
+ return new Promise((resolve,reject)=>{
+  let tx;
+  try{tx=d.transaction('orders','readwrite');
+      tx.objectStore('orders').put({documentNo:getNo(order),order,recordedAt:new Date().toISOString()})}
+  catch(e){d.close();return reject(e)}
+  tx.oncomplete=()=>{d.close();resolve(true)};
+  tx.onerror=()=>{const e=tx.error;d.close();reject(e||Error('Emergency order save failed'))};
+  tx.onabort=()=>{const e=tx.error;d.close();reject(e||Error('Emergency order save aborted'))};
+ });
+}
+async function emergencyRead(number){
+ const d=await emergencyDB();
+ return new Promise((resolve,reject)=>{
+  let tx,req;
+  try{tx=d.transaction('orders','readonly');req=tx.objectStore('orders').get(number)}
+  catch(e){d.close();return reject(e)}
+  req.onsuccess=()=>{const o=req.result?.order||null;d.close();resolve(o)};
+  req.onerror=()=>{const e=req.error;d.close();reject(e||Error('Emergency order read failed'))};
+ });
+}
+async function emergencyAll(){
+ const d=await emergencyDB();
+ return new Promise((resolve,reject)=>{
+  let tx,req;
+  try{tx=d.transaction('orders','readonly');req=tx.objectStore('orders').getAll()}
+  catch(e){d.close();return reject(e)}
+  req.onsuccess=()=>{const data=req.result||[];d.close();resolve(data)};
+  req.onerror=()=>{const e=req.error;d.close();reject(e||Error('Emergency order list failed'))};
+ });
+}
+function downloadEmergency(order){
+ const data=JSON.stringify({app:'Aerovex ERP',type:'Emergency Sales Order backup',order},null,2);
+ const u=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+ const a=document.createElement('a');a.href=u;
+ a.download='Aerovex-SO-Emergency-'+getNo(order).replace(/[^a-z0-9_-]/gi,'-')+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(u),3000);
+}
+let mostRecentUnsaved=null;
+function addEmergencyBackupButton(order){
+ if(!order||!document.getElementById('axSOCloudSaveResult'))return;
+ const box=document.getElementById('axSOCloudSaveResult');
+ const btn=document.createElement('button');btn.type='button';
+ btn.textContent='Download Emergency Sales Order Backup';
+ btn.onclick=()=>downloadEmergency(order);
+ box.appendChild(btn);
+}
 async function authorized(){
  let session;
  try{session=JSON.parse(sessionStorage.getItem(STORE)||'null')}catch(e){}
@@ -85,12 +145,17 @@ function equalDocs(a,b){
  // address, tax or commercial term for the same saved sales order.
  return JSON.stringify(canon(a))===JSON.stringify(canon(b));
 }
-async function upload(number){
+async function upload(number,emergencyOrder=null){
  if(uploading)return showState('Cloud Save already running. Please do not press Save again.','busy',null);
  uploading=true;
+ let order=emergencyOrder,phoneSaved=false;
  try{
-  const order=localOrder(number);
-  showState('✓ Sales Order '+number+' saved on this device. Checking secure Cloud Save…','busy',null);
+  if(!order){
+   try{order=localOrder(number);phoneSaved=true}
+   catch(error){order=await emergencyRead(number).catch(()=>null);if(!order)throw error}
+  }
+  if(getNo(order)!==number)throw Error('Sales Order number mismatch. Upload refused.');
+  showState((phoneSaved?'✓ Phone Saved. ':'⚠ Phone storage full. ')+'Verifying Cloud Save for '+number+'…','busy',null);
   const ctx=await authorized();
   for(let attempt=0;attempt<3;attempt++){
    const c=await readCloud(ctx);
@@ -98,7 +163,7 @@ async function upload(number){
    if(sameNo.length){
     if(sameNo.length!==1||!equalDocs(sameNo[0],order))
      throw Error('Cloud already has '+number+' with different details. Existing order protected. Verify document numbers.');
-    showState('✓ '+number+' — CLOUD SAVED & VERIFIED. No duplicate created.','success');
+    showState('✓ '+number+' — CLOUD SAVED & VERIFIED'+(phoneSaved?' + PHONE SAVED':' (phone localStorage full; IndexedDB emergency backup retained)')+'. No duplicate created.','success');
     return;
    }
    // Clone the most recent cloud payload; append only the new SO,
@@ -120,13 +185,14 @@ async function upload(number){
    const check=await readCloud(ctx);
    const found=check.payload.salesOrders.find(x=>getNo(x)===number);
    if(found&&equalDocs(found,order)){
-    showState('✓ SALES ORDER SAVED — Phone + Cloud verified: '+number,'success');
+    showState('✓ SALES ORDER CLOUD SAVED & VERIFIED: '+number+(phoneSaved?' — Phone also saved.':' — Phone localStorage full; emergency backup retained. Do not clear app data.'),'success');
     return;
    }
   }
   throw Error('Cloud changed while saving. Your phone copy is safe; retry verification.');
  }catch(e){
-  showState('⚠ PHONE SAVED / CLOUD NOT VERIFIED — '+number+'. '+(e?.message||e)+'. Do not create another order.','warning',number);
+  showState('⚠ '+(phoneSaved?'PHONE SAVED':'PHONE STORAGE FULL / EMERGENCY COPY')+' — CLOUD NOT VERIFIED: '+number+'. '+(e?.message||e)+'. Do not create another order.','warning',number);
+  if(order&&!phoneSaved)addEmergencyBackupButton(order);
  }finally{uploading=false}
 }
 async function inspectOrders(node){
@@ -255,6 +321,25 @@ function bind(form){
    if(persisted){
     showState('✓ '+no+' saved on PHONE; Preview failed: '+text(error?.message||error)+'. Verifying Cloud…','warning',null);
     upload(no);
+    return false;
+   }
+   // QuotaExceededError: the SO was created in RAM but localStorage
+   // rejected the write. Preserve it outside localStorage and upload ONLY this
+   // order using cloud's latest snapshot with atomic updated_at matching.
+   const quota=error?.name==='QuotaExceededError'||/quota|storage full|setItem/i.test(text(error?.message||error));
+   const pending=Array.isArray(db?.salesOrders)?db.salesOrders.find(x=>getNo(x)===no&&!before.includes(x)):null;
+   if(quota&&pending){
+    db.salesOrders=before; // do not claim the phone's original storage was changed
+    mostRecentUnsaved=pending;
+    showState('⚠ PHONE STORAGE FULL — '+no+' is NOT saved in localStorage. Making emergency backup and saving to Cloud…','warning',null);
+    (async()=>{
+      let protectedCopy=false;
+      try{await emergencyWrite(pending);protectedCopy=true}
+      catch(backupError){console.warn('Emergency IndexedDB unavailable',backupError)}
+      // Always allow an explicit JSON backup, even without IndexedDB.
+      await upload(no,pending);
+      if(!protectedCopy)addEmergencyBackupButton(pending);
+    })();
     return false;
    }
    if(Array.isArray(db?.salesOrders))db.salesOrders=before;
