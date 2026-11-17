@@ -34,12 +34,14 @@ const rows=[
 [6000,'Sparkler Filter Cloth Pad','AFX-SFP-19X43','Sparkler Filter Cloth Pad 19" x 43"'],
 [6001,'Sparkler Filter Cloth Pad','AFX-SFP-15X43','Sparkler Filter Cloth Pad 15" x 43"'],
 [6002,'Sparkler Filter Cloth Pad','AFX-SFP-25X55','Sparkler Filter Cloth Pad 25" x 55"']
-].map(([itemNo,category,legacyCode,name])=>Object.freeze({itemNo:String(itemNo),itemCode:String(itemNo),category,code:'AFX-'+String(itemNo),technicalCode:legacyCode,legacyCode,name,description:name,productCode:'AFX-'+String(itemNo),productName:name,source:'Aerovex approved 29-item AFX product code master'}));
+].map(([itemNo,category,legacyCode,name])=>{const code='AFX-'+String(itemNo)+'-'+legacyCode.replace(/^AFX-/,'');return Object.freeze({itemNo:String(itemNo),itemCode:String(itemNo),category,code,shortCode:'AFX-'+String(itemNo),technicalCode:legacyCode,legacyCode,name,description:name,productCode:code,productName:name,source:'CFM exact category-wise numbering with AFX prefix'});});
 const norm=v=>String(v??'').toUpperCase().trim().replace(/[×]/g,'X').replace(/["'″]/g,'').replace(/[^A-Z0-9]+/g,' ');
 const compact=v=>norm(v).replace(/\s+/g,'');
 const html=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byCode=new Map(rows.map(x=>[x.code,x]));
 const byTechnical=new Map(rows.map(x=>[x.technicalCode,x]));
+const byShort=new Map(rows.map(x=>[x.shortCode,x]));
+const byEFPPL=new Map(rows.flatMap(x=>[[x.code.replace(/^AFX-/,'EFPPL-'),x],[x.technicalCode.replace(/^AFX-/,'EFPPL-'),x]]));
 const byItem=new Map(rows.map(x=>[x.itemNo,x]));
 const byName=new Map(rows.map(x=>[compact(x.name),x]));
 function resolve(value){
@@ -47,6 +49,8 @@ function resolve(value){
  const code=String(item.productCode||item.code||'').trim().toUpperCase();
  if(byCode.has(code))return byCode.get(code);
  if(byTechnical.has(code))return byTechnical.get(code);
+ if(byShort.has(code))return byShort.get(code);
+ if(byEFPPL.has(code))return byEFPPL.get(code);
  const itemNo=String(item.itemNo||item.itemCode||'').trim();
  if(byItem.has(itemNo))return byItem.get(itemNo);
  const desc=String(item.description||item.productName||item.name||'').trim();
@@ -150,14 +154,14 @@ function bindRow(row){
  const label=document.createElement('label');
  label.className='axAFXProductCodeChoice';
  label.style.cssText='display:block;grid-column:1/-1;padding:9px;background:#edf6fb;border:1px solid #c2dbe6;border-radius:8px;margin:6px 0;font-size:12px;font-weight:700;color:#0b4961';
- label.textContent='AFX Product Code (29-item approved master)';
+ label.textContent='Main Heading — AFX Product Code (29 approved products)';
  const select=document.createElement('select');
  select.className='axAFXProductCodeSelect';select.style.cssText='display:block;width:100%;padding:11px;margin-top:6px;min-height:43px';
  select.innerHTML='<option value="">Select product code (or leave blank for custom item)</option>'+
   rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.itemNo+' · '+x.code+' · '+x.name)+'</option>').join('');
  label.appendChild(select);
  const existing=String(row.querySelector('[data-field="productCode"],[data-k="productCode"],[data-bill-field="productCode"],[data-key="productCode"]')?.value||'').toUpperCase();
- const found=byCode.get(existing)||byTechnical.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
+ const found=byCode.get(existing)||byTechnical.get(existing)||byShort.get(existing)||byEFPPL.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
  if(found)select.value=found.code;
  select.onchange=()=>{
   const selected=byCode.get(select.value);
@@ -179,7 +183,7 @@ function bindSimple(form){
  if(!/PRODUCT|QUOTATION|WORK ORDER/.test(heading))return;
  form.dataset.axAFXSimple='1';
  const wrapper=document.createElement('label');
- wrapper.textContent='AFX Product Code';
+ wrapper.textContent='Main Heading — AFX Product Code';
  const select=document.createElement('select');select.style.cssText='display:block;width:100%;padding:12px';
  select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.itemNo+' · '+x.code+' · '+x.name)+'</option>').join('');
  const code=document.createElement('input');code.type='hidden';code.name='productCode';
@@ -194,10 +198,10 @@ function bind(){
  modal.querySelectorAll('form').forEach(bindSimple);
 }
 function renderMaster(){
- const extras=(Array.isArray(db.products)?db.products:[]).filter(x=>{const code=String(x.code||x.productCode||'').toUpperCase();return !byCode.has(code)&&!byTechnical.has(code)});
+ const extras=(Array.isArray(db.products)?db.products:[]).filter(x=>{const code=String(x.code||x.productCode||'').toUpperCase();return !byCode.has(code)&&!byTechnical.has(code)&&!byShort.has(code)&&!byEFPPL.has(code)});
  const content='<section style="font:13px Arial;max-width:100%;overflow:auto">'+
  '<h3>AEROVEX FILTRATION — AFX Product Code Master</h3>'+
- '<p>29 approved products • Item Number + AFX Code • Same sequence as CFM. Rates, GST and historical invoices are not changed.</p>'+
+ '<p>29 approved products • Full heading AFX-ItemNo-TechnicalCode • CFM sequence with EFPPL replaced by AFX. Custom specifications stay in Description; rates, GST and past invoices remain unchanged.</p>'+
  '<input id="axAFXMasterSearch" placeholder="Search code / item no. / description" style="width:100%;padding:12px;margin-bottom:10px">'+
  '<table style="width:100%;border-collapse:collapse;min-width:540px;font-size:12px"><thead><tr>'+
  ['Item No.','Category','AFX Product Code','Product Description'].map(v=>'<th style="padding:9px;text-align:left;border:1px solid #ccd">'+v+'</th>').join('')+'</tr></thead><tbody>'+
