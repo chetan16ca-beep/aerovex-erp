@@ -40,7 +40,7 @@ html,body{background:white!important;color:#000!important;margin:0!important}
 <header><h1>AEROVEX FILTRATION</h1><small>Smart Filtration Solutions · MOBILE VIEW ONLY</small></header>
 <main>
 <section class="card"><strong>READ-ONLY</strong> · Cloud Sales Orders, Invoices, Challans and Quotations
-<p class="hint">This separate page displays saved Cloud records only. No Save, Edit, Delete, Sync Upload or local ERP database writes. PC remains the primary entry device.</p></section>
+<p class="hint">This separate page displays saved Cloud records only. No Save, Edit, Delete, Sync Upload or local ERP database writes. PC remains the primary entry device.</p><button type="button" id="printTest" class="secondary">Test PDF (No Customer Data)</button></section>
 <section id="loginCard" class="card"><h2>Owner Sign In</h2>
 <p class="hint">Enter the existing Aerovex Cloud owner password. The password is not stored on this device.</p>
 <form id="signin"><label for="password">Cloud password</label><input type="password" id="password" required autocomplete="current-password" placeholder="Owner password">
@@ -145,6 +145,7 @@ function preview(kind,i){
  document.body.classList.add('preview');
  window.scrollTo(0,0);
 }
+el('printTest').onclick=()=>{el('printPaper').innerHTML='<div class="printPage"><article class="printDoc"><div class="printHeader"><div><h1>AEROVEX FILTRATION</h1>Smart Filtration Solutions</div><div><h2>A4 PRINT TEST</h2>No customer data</div></div><p style="padding:40px 0">If this text is visible in the Android print preview, the standalone print route is working.</p><p>Test only. No invoice, order or stock was modified.</p></article></div>';document.body.classList.add('preview');document.title='Aerovex A4 Print Test';window.scrollTo(0,0)};
 el('signin').addEventListener('submit',login);
 el('refresh').onclick=refresh;
 el('kind').onchange=list;el('search').oninput=list;
