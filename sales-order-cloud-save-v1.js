@@ -145,7 +145,7 @@ function equalDocs(a,b){
  // address, tax or commercial term for the same saved sales order.
  return JSON.stringify(canon(a))===JSON.stringify(canon(b));
 }
-async function upload(number,emergencyOrder=null){
+async function upload(number,emergencyOrder=null,backupPersisted=false){
  if(uploading)return showState('Cloud Save already running. Please do not press Save again.','busy',null);
  uploading=true;
  let order=emergencyOrder,phoneSaved=false;
@@ -163,7 +163,7 @@ async function upload(number,emergencyOrder=null){
    if(sameNo.length){
     if(sameNo.length!==1||!equalDocs(sameNo[0],order))
      throw Error('Cloud already has '+number+' with different details. Existing order protected. Verify document numbers.');
-    showState('✓ '+number+' — CLOUD SAVED & VERIFIED'+(phoneSaved?' + PHONE SAVED':' (phone localStorage full; IndexedDB emergency backup retained)')+'. No duplicate created.','success');
+    showState('✓ '+number+' — CLOUD SAVED & VERIFIED'+(phoneSaved?' + PHONE SAVED':backupPersisted?' (phone full; IndexedDB backup retained)':' (phone full; download an emergency backup)')+'. No duplicate created.','success');
     return;
    }
    // Clone the most recent cloud payload; append only the new SO,
@@ -185,7 +185,7 @@ async function upload(number,emergencyOrder=null){
    const check=await readCloud(ctx);
    const found=check.payload.salesOrders.find(x=>getNo(x)===number);
    if(found&&equalDocs(found,order)){
-    showState('✓ SALES ORDER CLOUD SAVED & VERIFIED: '+number+(phoneSaved?' — Phone also saved.':' — Phone localStorage full; emergency backup retained. Do not clear app data.'),'success');
+    showState('✓ SALES ORDER CLOUD SAVED & VERIFIED: '+number+(phoneSaved?' — Phone also saved.':backupPersisted?' — Phone storage full; IndexedDB backup retained.':' — Phone storage full; download the emergency backup below.'),'success');
     return;
    }
   }
@@ -337,7 +337,7 @@ function bind(form){
       try{await emergencyWrite(pending);protectedCopy=true}
       catch(backupError){console.warn('Emergency IndexedDB unavailable',backupError)}
       // Always allow an explicit JSON backup, even without IndexedDB.
-      await upload(no,pending);
+      await upload(no,pending,protectedCopy);
       if(!protectedCopy)addEmergencyBackupButton(pending);
     })();
     return false;
