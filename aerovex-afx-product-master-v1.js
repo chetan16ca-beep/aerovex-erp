@@ -158,7 +158,7 @@ function bindRow(row){
  const select=document.createElement('select');
  select.className='axAFXProductCodeSelect';select.style.cssText='display:block;width:100%;padding:11px;margin-top:6px;min-height:43px';
  select.innerHTML='<option value="">Select product code (or leave blank for custom item)</option>'+
-  rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.itemNo+' · '+x.code+' · '+x.name)+'</option>').join('');
+  rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code+' · '+x.name)+'</option>').join('');
  label.appendChild(select);
  const existing=String(row.querySelector('[data-field="productCode"],[data-k="productCode"],[data-bill-field="productCode"],[data-key="productCode"]')?.value||'').toUpperCase();
  const found=byCode.get(existing)||byTechnical.get(existing)||byShort.get(existing)||byEFPPL.get(existing)||resolve({description:desc.value,size:row.querySelector('[data-field="size"],[data-k="size"],[data-key="size"]')?.value});
@@ -185,7 +185,7 @@ function bindSimple(form){
  const wrapper=document.createElement('label');
  wrapper.textContent='Main Heading — AFX Product Code';
  const select=document.createElement('select');select.style.cssText='display:block;width:100%;padding:12px';
- select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.itemNo+' · '+x.code+' · '+x.name)+'</option>').join('');
+ select.innerHTML='<option value="">Select 29-item product code</option>'+rows.map(x=>'<option value="'+html(x.code)+'">'+html(x.code+' · '+x.name)+'</option>').join('');
  const code=document.createElement('input');code.type='hidden';code.name='productCode';
  const num=document.createElement('input');num.type='hidden';num.name='itemNo';
  select.onchange=()=>{const x=byCode.get(select.value);code.value=x?.code||'';num.value=x?.itemNo||'';if(x&&!input.value.trim())input.value=x.name;};
@@ -201,12 +201,12 @@ function renderMaster(){
  const extras=(Array.isArray(db.products)?db.products:[]).filter(x=>{const code=String(x.code||x.productCode||'').toUpperCase();return !byCode.has(code)&&!byTechnical.has(code)&&!byShort.has(code)&&!byEFPPL.has(code)});
  const content='<section style="font:13px Arial;max-width:100%;overflow:auto">'+
  '<h3>AEROVEX FILTRATION — AFX Product Code Master</h3>'+
- '<p>29 approved products • Full heading AFX-ItemNo-TechnicalCode • CFM sequence with EFPPL replaced by AFX. Custom specifications stay in Description; rates, GST and past invoices remain unchanged.</p>'+
- '<input id="axAFXMasterSearch" placeholder="Search code / item no. / description" style="width:100%;padding:12px;margin-bottom:10px">'+
+ '<p>29 approved products • Main heading: AFX-ItemNo-TechnicalCode (no separate number before the code) • CFM sequence with EFPPL replaced by AFX. Custom specifications stay in Description; rates, GST and past invoices remain unchanged.</p>'+
+ '<input id="axAFXMasterSearch" placeholder="Search AFX code / product description" style="width:100%;padding:12px;margin-bottom:10px">'+
  '<table style="width:100%;border-collapse:collapse;min-width:540px;font-size:12px"><thead><tr>'+
- ['Item No.','Category','AFX Product Code','Product Description'].map(v=>'<th style="padding:9px;text-align:left;border:1px solid #ccd">'+v+'</th>').join('')+'</tr></thead><tbody>'+
+ ['AFX Product Code','Category','Product Description'].map(v=>'<th style="padding:9px;text-align:left;border:1px solid #ccd">'+v+'</th>').join('')+'</tr></thead><tbody>'+
  rows.map(x=>'<tr class="axAFXMasterRow" data-search="'+html(norm(x.itemNo+' '+x.category+' '+x.code+' '+x.name))+'">'+
- [x.itemNo,x.category,x.code,x.name].map(v=>'<td style="padding:8px;border:1px solid #dde">'+html(v)+'</td>').join('')+'</tr>').join('')+
+ [x.code,x.category,x.name].map(v=>'<td style="padding:8px;border:1px solid #dde">'+html(v)+'</td>').join('')+'</tr>').join('')+
  '</tbody></table><p>Existing custom products: '+extras.length+' (preserved; no deletion).</p>'+
  '<p><button id="axAFXCustomProduct">Add Custom Product</button></p></section>';
  show('AFX Product Code Master — 29 Items',content);
