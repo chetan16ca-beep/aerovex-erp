@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b4961">
+<title>Aerovex | Mobile Read-Only &amp; PDF Viewer</title>
+<style>
+:root{color-scheme:light;font-family:Arial,Helvetica,sans-serif;color:#153549;background:#eef4f7}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}
+header{background:#0b4961;color:white;padding:15px 17px}header h1{font-size:19px;margin:0 0 4px}header small{opacity:.9}
+main{max-width:1040px;margin:0 auto;padding:16px}.card{background:#fff;border:1px solid #d4e3ed;border-radius:12px;padding:15px;margin-bottom:13px;box-shadow:0 2px 9px #10394d0e}
+h2{font-size:17px;margin:0 0 12px}.hint{font-size:13px;color:#45687b;line-height:1.55}.warning{color:#964b1a}
+label{display:block;font-size:13px;font-weight:bold;margin:10px 0 5px}input,select{padding:12px;border:1px solid #a5bdc9;border-radius:8px;width:100%;min-height:44px;background:#fff;color:#16374c}
+button{border:0;background:#0b4961;color:#fff;border-radius:8px;padding:12px 14px;min-height:44px;font-weight:bold;cursor:pointer}
+button.secondary{background:#546977}button:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.actions>*{flex:0 1 auto}
+.notice{padding:12px;background:#e9f5fc;border:1px solid #bbdae8;border-radius:8px;margin-top:12px;white-space:pre-wrap;line-height:1.45}
+small.muted{color:#5f7a88}.tableWrap{max-width:100%;overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid #e1ebf0;text-align:left;padding:10px 7px;vertical-align:top}th{background:#f1f7f9;color:#234c65}td:last-child{text-align:right}.docBtn{padding:7px 10px;min-height:36px}
+#previewPanel{display:none}body.preview #app{display:none}body.preview #previewPanel{display:block}
+#printActions{position:sticky;top:0;z-index:5;background:#e5f2fa;padding:12px;display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid #adc9d6}
+#printPaper{background:white;color:#222;max-width:830px;min-height:420px;margin:16px auto;padding:20px;box-shadow:0 3px 12px #183b4a20}
+.printDoc{font-size:12px;line-height:1.5;margin:0 auto}.printDoc h1{font-size:22px;margin:0}.printDoc h2{font-size:18px;margin:5px 0;color:#15354c}
+.printHeader{border-bottom:2px solid #0b4961;padding-bottom:12px;display:flex;justify-content:space-between;gap:16px}
+.printMeta,.printAddresses,.printFoot{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.printBox{border:1px solid #b5cbd3;padding:10px;min-height:62px;white-space:pre-wrap;overflow-wrap:anywhere}
+.printDoc table{font-size:11px}.printDoc td,.printDoc th{border:1px solid #bdcbd2;padding:7px}.printDoc td:last-child{text-align:left}
+.printTotals{margin-left:auto;width:min(280px,100%);margin-top:15px}.printTotals>div{display:flex;justify-content:space-between;border-bottom:1px solid #ccd7dd;padding:6px}
+.sign{margin-top:35px;text-align:right}.copyMark{font-weight:bold;text-align:center;letter-spacing:1px;margin-bottom:12px}
+.printPage{break-after:page;page-break-after:always}.printPage:last-child{break-after:auto;page-break-after:auto}
+@page{size:A4;margin:12mm}
+@media print{
+html,body{background:white!important;color:#000!important;margin:0!important}
+#app,#printActions{display:none!important}
+#previewPanel{display:block!important}
+#printPaper{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;min-height:0!important;box-shadow:none!important}
+.printHeader,.printAddresses,.printFoot{break-inside:avoid}
+}
+@media(max-width:500px){.printMeta,.printAddresses,.printFoot{grid-template-columns:1fr}.printHeader{flex-direction:column}#printPaper{padding:10px}}
+</style></head>
+<body>
+<div id="app">
+<header><h1>AEROVEX FILTRATION</h1><small>Smart Filtration Solutions · MOBILE VIEW ONLY</small></header>
+<main>
+<section class="card"><strong>READ-ONLY</strong> · Cloud Sales Orders, Invoices, Challans and Quotations
+<p class="hint">This separate page displays saved Cloud records only. No Save, Edit, Delete, Sync Upload or local ERP database writes. PC remains the primary entry device.</p></section>
+<section id="loginCard" class="card"><h2>Owner Sign In</h2>
+<p class="hint">Enter the existing Aerovex Cloud owner password. The password is not stored on this device.</p>
+<form id="signin"><label for="password">Cloud password</label><input type="password" id="password" required autocomplete="current-password" placeholder="Owner password">
+<div class="actions" style="margin-top:12px"><button type="submit">Sign In &amp; Read Cloud</button></div></form></section>
+<section id="records" hidden>
+<div class="card"><div class="actions"><button id="refresh" type="button">Refresh from Cloud</button><button class="secondary" id="signout" type="button">Sign Out</button></div>
+<div class="notice" id="status" role="status">Not loaded.</div><p class="hint warning">Only documents already uploaded to the Cloud can appear here. If a document is missing, check it on the main PC and do not recreate it blindly.</p></div>
+<div class="card"><label for="kind">Document type</label><select id="kind"><option value="invoices">Invoices / Bills</option><option value="salesOrders">Sales Orders</option><option value="challans">Delivery Challans</option><option value="quotations">Quotations</option><option value="purchaseOrders">Purchase Orders</option></select>
+<label for="search">Find number, party or date</label><input id="search" placeholder="Search saved documents">
+<p class="hint" id="count"></p>
+<div class="tableWrap"><table><thead><tr><th>Document</th><th>Date</th><th>Party</th><th>Action</th></tr></thead><tbody id="listing"></tbody></table></div>
+</div></section>
+<p id="loginStatus" class="notice" role="status">Secure view: sign in to read saved Cloud records.</p>
+</main></div>
+<section id="previewPanel" aria-label="Printable Document"><div id="printActions"><button id="printNow" type="button">Print / Save as PDF</button><button id="goBack" type="button" class="secondary">Back to Documents</button><span class="hint">Check the visible document first, then choose Save as PDF in Android Print.</span></div><div id="printPaper"></div></section>
+<script>
+(function(){
+'use strict';
+const ROOT='https://gfdqzyhhpbhvubpwdxdi.supabase.co',APIKEY='sb_publishable_EXF3rH1gM0bMF6yhGWiUig_XsCa3MrM',OWNER='aerovexfiltration@gmail.com';
+const el=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const val=(x,...keys)=>{for(const k of keys){const t=x?.[k];if(t!==undefined&&t!==null&&String(t).trim())return t;}return ''};
+const number=v=>{if(v===null||v===undefined||v==='')return '—';const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):String(v)};
+const labels={invoices:'TAX INVOICE',salesOrders:'SALES ORDER',challans:'DELIVERY CHALLAN',quotations:'SALES QUOTATION',purchaseOrders:'PURCHASE ORDER'};
+const no=(x,i)=>val(x,'documentNo','invoiceNo','quotationNo','poNo','orderNo','no','ref')||('Legacy document #'+(i+1));
+let session=null,cloud=null;
+async function request(path,options={}){
+ const res=await fetch(ROOT+path,{cache:'no-store',...options,headers:{apikey:APIKEY,Accept:'application/json',...(session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...(options.body?{'Content-Type':'application/json'}:{})}});
+ const body=await res.json().catch(()=>null);
+ if(!res.ok)throw Error((body?.msg||body?.message||body?.error_description||'HTTP '+res.status));
+ return body;
+}
+function status(msg){el('status').textContent=msg;el('loginStatus').textContent=msg}
+async function login(evt){
+ evt.preventDefault();const password=el('password').value;const btn=el('signin').querySelector('button');btn.disabled=true;el('loginStatus').textContent='Signing in…';
+ try{
+  const token=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:OWNER,password})});
+  if(!token?.access_token)throw Error('No session received');
+  session=token;
+  const profile=await request('/auth/v1/user');
+  if(String(profile?.email||'').toLowerCase()!==OWNER)throw Error('Owner account does not match');
+  session.user=profile;
+  el('password').value='';
+  el('loginCard').hidden=true;el('records').hidden=false;
+  await refresh();
+ }catch(e){session=null;el('loginStatus').textContent='Sign-in or Cloud read failed: '+e.message}
+ finally{btn.disabled=false}
+}
+async function refresh(){
+ if(!session?.user?.id)return;
+ el('refresh').disabled=true;status('Reading latest Cloud snapshot…');
+ try{
+  const rows=await request('/rest/v1/erp_snapshots?select=payload,updated_at&user_id=eq.'+encodeURIComponent(session.user.id)+'&limit=1');
+  if(!Array.isArray(rows)||!rows.length)throw Error('No Cloud snapshot. PC and phone records have NOT been deleted.');
+  if(!rows[0].payload||typeof rows[0].payload!=='object')throw Error('Cloud payload unavailable.');
+  cloud=rows[0];const d=cloud.payload;
+  const counts=['invoices','salesOrders','challans','quotations'].map(k=>labels[k]+': '+(Array.isArray(d[k])?d[k].length:0)).join(' | ');
+  status('Cloud last updated: '+new Date(cloud.updated_at).toLocaleString('en-IN')+'. '+counts+'. View-only: no device database write.');
+  list();
+ }catch(e){status('Cloud read failed: '+e.message+'. Existing PC and phone data untouched.')}
+ finally{el('refresh').disabled=false}
+}
+function list(){
+ const kind=el('kind').value,source=Array.isArray(cloud?.payload?.[kind])?cloud.payload[kind]:[],q=el('search').value.trim().toLowerCase();
+ const rows=source.map((x,i)=>({x,i})).filter(({x,i})=>[no(x,i),x.party,x.customerName,x.billToName,x.supplierName,x.date].some(v=>String(v??'').toLowerCase().includes(q))).reverse();
+ el('count').textContent='Showing '+rows.length+' of '+source.length+' saved '+labels[kind].toLowerCase()+' records.';
+ const body=el('listing');body.textContent='';
+ for(const {x,i} of rows.slice(0,150)){
+  const tr=document.createElement('tr');
+  for(const field of [no(x,i),x.date||'—',val(x,'party','billToName','customerName','supplierName')||'—']){
+   const td=document.createElement('td');td.textContent=String(field);tr.appendChild(td);
+  }
+  const td=document.createElement('td'),btn=document.createElement('button');
+  btn.type='button';btn.className='docBtn';btn.textContent='View / PDF';btn.onclick=()=>preview(kind,i);
+  td.appendChild(btn);tr.appendChild(td);body.appendChild(tr);
+ }
+ if(rows.length>150)el('count').textContent+=' Refine search for older entries.';
+}
+function box(title,content){return '<div class="printBox"><b>'+esc(title)+'</b><div>'+esc(content||'Not recorded').replace(/\n/g,'<br>')+'</div></div>'}
+function docHTML(kind,x,i,mark=''){
+ const privateDoc=kind==='salesOrders'||kind==='challans';
+ const company=cloud?.payload?.companySettings||{};
+ const docTitle=labels[kind],docNumber=no(x,i);
+ const items=Array.isArray(x.items)&&x.items.length?x.items:[x];
+ const cols=privateDoc?5:7;
+ const rows=items.map((item,n)=>'<tr><td>'+String(n+1)+'</td><td>'+esc(val(item,'description','name','product','item')||'—')+'</td><td>'+esc(val(item,'hsn','hsnCode')||val(x,'hsn','hsnCode')||'—')+'</td><td>'+esc(item.qty??'—')+'</td><td>'+esc(val(item,'unit','uom')||'—')+'</td>'+(privateDoc?'':'<td>'+esc(number(item.rate))+'</td><td>'+esc(number(val(item,'taxable','amount')) )+'</td>')+'</tr>').join('');
+ const billName=val(x,'billToName','party','customerName','name','supplierName'),shipName=val(x,'shipToName')||billName;
+ const amountTable=privateDoc?'':('<div class="printTotals">'+[['Taxable Value',val(x,'taxable')],['GST',val(x,'gst')],['IGST',val(x,'igst')],['CGST',val(x,'cgst')],['SGST',val(x,'sgst')],['Grand Total',val(x,'total','amount')]].filter(([k,v])=>k==='Grand Total'||v!==''&&v!==null&&v!==undefined).map(([k,v])=>'<div><b>'+esc(k)+'</b><b>'+esc(number(v))+'</b></div>').join('')+'</div>');
+ return '<article class="printDoc"><div class="copyMark">'+esc(mark)+'</div><div class="printHeader"><div><h1>AEROVEX FILTRATION</h1><div>Smart Filtration Solutions</div><div>GSTIN: '+esc(val(company,'gstin','companyGstin')||'Verify company GSTIN')+'</div></div><div><h2>'+esc(docTitle)+'</h2><strong>'+esc(docNumber)+'</strong></div></div>'+
+ '<div class="printMeta">'+box('Document Date',x.date)+box('PO / Reference',val(x,'poRef','ref'))+'</div>'+
+ '<div class="printAddresses">'+box(kind==='purchaseOrders'?'SUPPLIER':'BILL TO',billName+'\n'+val(x,'billToAddress','billingAddress','address')+'\nGSTIN: '+val(x,'billToGstin','gstin'))+box('SHIP TO',shipName+'\n'+val(x,'shipToAddress','shippingAddress','deliveryAddress','deliveryLocation'))+'</div>'+
+ '<table><thead><tr><th>NO.</th><th>DESCRIPTION</th><th>HSN</th><th>QTY</th><th>UOM</th>'+(privateDoc?'':'<th>RATE</th><th>VALUE</th>')+'</tr></thead><tbody>'+rows+'</tbody></table>'+
+ amountTable+'<div class="printFoot">'+box('Delivery / Terms',val(x,'delivery','payment','remarks'))+box('Dispatch / Reference',val(x,'shippingInstructions','dispatchInstructions','sourceSalesOrder'))+'</div>'+
+ '<div class="sign">For AEROVEX FILTRATION<br><br><br>Authorized Signatory</div>'+
+ '<p style="font-size:10px;color:#555">Values and details are from the saved Cloud document. Verify HSN, tax and addresses before issue.</p></article>';
+}
+function preview(kind,i){
+ const x=cloud?.payload?.[kind]?.[i];if(!x)return status('Document missing in latest Cloud read. Refresh first.');
+ const copies=kind==='invoices'?['ORIGINAL','DUPLICATE','TRIPLICATE']:kind==='challans'?['ORIGINAL','DUPLICATE']:[''];
+ el('printPaper').innerHTML=copies.map(mark=>'<div class="printPage">'+docHTML(kind,x,i,mark)+'</div>').join('');
+ document.title=no(x,i)+' — Aerovex PDF';
+ document.body.classList.add('preview');
+ window.scrollTo(0,0);
+}
+el('signin').addEventListener('submit',login);
+el('refresh').onclick=refresh;
+el('kind').onchange=list;el('search').oninput=list;
+el('signout').onclick=()=>{session=null;cloud=null;el('records').hidden=true;el('loginCard').hidden=false;el('password').value='';el('loginStatus').textContent='Signed out. No ERP data saved to phone storage.'};
+el('goBack').onclick=()=>{document.body.classList.remove('preview');el('printPaper').textContent='';document.title='Aerovex | Mobile Read-Only & PDF Viewer'};
+el('printNow').onclick=()=>{if(!document.body.classList.contains('preview')||!el('printPaper').textContent.trim())return alert('Open a document first.');window.print()};
+})();
+</script></body></html>
