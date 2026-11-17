@@ -499,20 +499,24 @@ function exportMobileNakshSafety(info){
  setTimeout(()=>URL.revokeObjectURL(url),15000);
 }
 async function prepareMobileNaksh(){
- if(!session)return status('Sign in as Owner first.');
- if(busy)return status('Sync is busy. Wait, then retry.');
+ const feedback=$('axMobileNakshFeedback');
+ const inform=message=>{status(message);if(feedback){feedback.textContent=message;feedback.style.display='block';}};
+ inform('4A clicked. Checking Owner login, device backup and Cloud records. Please wait…');
+ if(!session){await boot();if(!session)return inform('4A needs Owner Cloud login. Close and reopen Cloud Sync, enter password, press Sign in as Owner, then 4A. No data changed.');}
+ if(busy)return inform('Sync is busy. Wait a moment, then press 4A again.');
  busy=true;preparedMobileNaksh=null;
  const apply=$('axMobileNakshApply');if(apply)apply.disabled=true;
  try{
   if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
   const current=local(),row=await cloud();
   if(!row)throw Error('Cloud unavailable; no action taken.');
+  inform('4A: Both phone and Cloud records loaded. Comparing invoice numbers safely…');
   verifiedMobileNakshAlignment(current,row.payload);
   preparedMobileNaksh={before:current,cloud:row};
   exportMobileNakshSafety(preparedMobileNaksh);
   if(apply)apply.disabled=false;
-  status('✓ MOBILE SAFE PREVIEW: NAKSH 003 is same Invoice as Cloud 004. Phone + Cloud safety JSON download requested. CONFIRM saved in Downloads, then click 4B Apply Mobile Alignment. Nothing changed yet.');
- }catch(e){status('Mobile preview blocked: '+e.message+'. Device and Cloud unchanged.')}
+  inform('✓ 4A COMPLETED: Backup JSON downloaded/requested. NAKSH 003 matches Cloud 004. Confirm the file in Downloads before pressing 4B. No records changed.');
+ }catch(e){inform('⚠ 4A BLOCKED: '+e.message+'. No data changed. Save a screenshot of this message.')}
  finally{busy=false}
 }
 async function applyMobileNaksh(){
@@ -660,8 +664,8 @@ async function boot(){
 }
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
- p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview">4A. Backup + Preview Mobile 003 to 004</button><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:2147483200;bottom:8px;right:8px;width:min(425px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;pointer-events:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status" style="position:sticky;top:0;z-index:2;background:#eff8fb;color:#12435b;border:1px solid #bfd6df;border-radius:7px;padding:10px;overflow-wrap:anywhere">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview" style="display:block;width:100%;font-weight:700;font-size:15px;color:#fff;background:#0b607c;border:0;border-radius:8px;padding:15px;min-height:54px;touch-action:manipulation;cursor:pointer">4A. Backup + Preview Mobile 003 to 004</button><p id="axMobileNakshFeedback" role="status" aria-live="polite" style="display:none;border:1px solid #9cbece;border-radius:7px;padding:12px;background:#eff8fb;font-weight:700;overflow-wrap:anywhere"></p><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -672,7 +676,7 @@ function panel(){
  $('ax2Repair').onclick=repairOldCloud;
  $('axNakshPrepare').onclick=prepareNakshRepair;
  $('axNakshApply').onclick=applyNakshRepair;
- $('axMobileNakshPreview').onclick=prepareMobileNaksh;
+ $('axMobileNakshPreview').onclick=()=>{const fb=$('axMobileNakshFeedback');if(fb){fb.style.display='block';fb.textContent='4A button pressed — checking Cloud and phone…';}prepareMobileNaksh().catch(e=>{const msg='4A failed: '+(e?.message||e);status(msg);if(fb)fb.textContent=msg;});};
  $('axMobileNakshApply').onclick=applyMobileNaksh;
  status(lastMessage);
 }
