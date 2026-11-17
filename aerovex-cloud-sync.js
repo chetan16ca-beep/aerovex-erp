@@ -76,6 +76,18 @@ function savedBaseline(){
  * No missing customer, invoice, challan, PO or stock record is discarded.
  * Ambiguous entries / conflicting edits require manual review.
  */
+function invoiceIdentityMismatch(a,b){
+ const seen=new Map();
+ for(const x of [...(Array.isArray(b)?b:[]),...(Array.isArray(a)?a:[])]){
+  const source=String(x?.sourceChallan||'').trim().toUpperCase();
+  const party=String(x?.party||'').trim().toUpperCase();
+  if(!source||!party)continue;
+  const identity=party+'|'+source,number=String(x.documentNo||x.invoiceNo||'').trim().toUpperCase();
+  const previous=seen.get(identity);
+  if(previous&&previous!==number)throw Error('Same delivery challan '+source+' for '+party+' has different invoice numbers '+previous+' and '+number+'. Resolve Invoice numbering before Join.');
+  seen.set(identity,number);
+ }
+}
 function firstJoinMerge(mine,remote){
  const out={},keys=new Set([...Object.keys(remote),...Object.keys(mine)]);
  const ambiguous=new Set(['cutting','departmentWork','packing','receipts','payments','expenses','ledger']);
@@ -85,6 +97,7 @@ function firstJoinMerge(mine,remote){
   if(b===undefined){out[k]=a;continue}
   if(stable(a)===stable(b)){out[k]=b;continue}
   if(Array.isArray(a)&&Array.isArray(b)){
+   if(k==='invoices')invoiceIdentityMismatch(a,b);
    if(ambiguous.has(k)){
     const prefix=(left,right)=>left.length<=right.length&&left.every((x,i)=>stable(x)===stable(right[i]));
     if(prefix(a,b)){out[k]=b;continue}
@@ -441,6 +454,98 @@ async function applyNakshRepair(){
   pendingNakshRepair=null;const applyButton=$('axNakshApply');if(applyButton)applyButton.disabled=true;
  }finally{busy=false}
 }
+/* Resolve only an already-verified mobile NAKSH 003 against the existing
+ * correct Cloud NAKSH 004. No Cloud write, no original invoice deletion.
+ * Both versions are exported before a separate explicit Apply action. */
+let preparedMobileNaksh=null;
+function verifiedMobileNakshAlignment(device,cloudSnapshot){
+ const mine=clone(device),remote=cloudSnapshot;
+ const old=unique(mine.invoices,x=>docNumber(x)==='AFX/INV/003'&&partyNaksh(x),'Mobile NAKSH Invoice 003');
+ const authoritative=unique(remote.invoices,x=>docNumber(x)==='AFX/INV/004'&&partyNaksh(x),'Cloud NAKSH Invoice 004');
+ if((mine.invoices||[]).some(x=>docNumber(x)==='AFX/INV/004'))
+  throw Error('Mobile already has Invoice 004; please recheck before importing.');
+ if(String(old.sourceChallan||'')!=='AFX/DC/004'||String(authoritative.sourceChallan||'')!=='AFX/DC/004')
+  throw Error('NAKSH source Challan differs; cannot align automatically.');
+ old.documentNo='AFX/INV/004';old.invoiceNo='AFX/INV/004';
+ if(stable(old)!==stable(authoritative))
+  throw Error('Mobile and Cloud NAKSH Invoice details differ beyond number. Do NOT overwrite; send current backup for comparison.');
+ const oldVoucher=unique(mine.vouchers,x=>x.type==='Sales'&&x.no==='AFX/INV/003'&&partyNaksh(x),'Mobile NAKSH Voucher 003');
+ const newVoucher=unique(remote.vouchers,x=>x.type==='Sales'&&x.no==='AFX/INV/004'&&partyNaksh(x),'Cloud NAKSH Voucher 004');
+ if((mine.vouchers||[]).some(x=>x.type==='Sales'&&x.no==='AFX/INV/004'))
+  throw Error('Mobile has another Invoice Voucher 004; manual review required.');
+ oldVoucher.no='AFX/INV/004';
+ if(stable(oldVoucher)!==stable(newVoucher))
+  throw Error('NAKSH voucher details differ beyond invoice number. No data changed.');
+ const pragna=(remote.vouchers||[]).filter(x=>x.type==='Sales'&&x.no==='AFX/INV/003'&&
+  /pragna/i.test(String(x.party||'')));
+ if(pragna.length!==1)throw Error('Pragna original Invoice Voucher 003 missing in Cloud. No update allowed.');
+ const reconciled=firstJoinMerge(mine,remote);
+ if(stable(reconciled)!==stable(remote))
+  throw Error('Other mobile-only records or differences remain. No mobile data was replaced; send a current phone backup for detailed reconciliation.');
+ return {aligned:mine,cloudCopy:clone(remote)};
+}
+function exportMobileNakshSafety(info){
+ const pack={
+  application:'Aerovex ERP',kind:'MOBILE NAKSH 003 to CLOUD 004 — SAFETY BACKUP',
+  createdAt:new Date().toISOString(),
+  notice:'Mobile and Cloud copies BEFORE any changes; no Cloud data will be modified by this operation.',
+  phoneOriginal:info.before,
+  cloudOriginal:{updated_at:info.cloud.updated_at,payload:info.cloud.payload}
+ };
+ const url=URL.createObjectURL(new Blob([JSON.stringify(pack)],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='Aerovex-MOBILE-NAKSH-003-TO-004-SAFETY-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+async function prepareMobileNaksh(){
+ if(!session)return status('Sign in as Owner first.');
+ if(busy)return status('Sync is busy. Wait, then retry.');
+ busy=true;preparedMobileNaksh=null;
+ const apply=$('axMobileNakshApply');if(apply)apply.disabled=true;
+ try{
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  const current=local(),row=await cloud();
+  if(!row)throw Error('Cloud unavailable; no action taken.');
+  verifiedMobileNakshAlignment(current,row.payload);
+  preparedMobileNaksh={before:current,cloud:row};
+  exportMobileNakshSafety(preparedMobileNaksh);
+  if(apply)apply.disabled=false;
+  status('✓ MOBILE SAFE PREVIEW: NAKSH 003 is same Invoice as Cloud 004. Phone + Cloud safety JSON download requested. CONFIRM saved in Downloads, then click 4B Apply Mobile Alignment. Nothing changed yet.');
+ }catch(e){status('Mobile preview blocked: '+e.message+'. Device and Cloud unchanged.')}
+ finally{busy=false}
+}
+async function applyMobileNaksh(){
+ if(!session||!preparedMobileNaksh)return status('First prepare and download mobile safety backup using 4A.');
+ if(busy)return status('Sync is busy; wait and retry.');
+ if(!confirm('Do you have the new MOBILE SAFETY JSON file in Downloads? This will align Mobile NAKSH invoice/voucher 003 to existing verified Cloud 004, keeping all other records. Cloud will NOT be changed. Continue?'))
+  return status('Mobile alignment cancelled. Data untouched.');
+ busy=true;paused=true;online=false;clearInterval(timer);timer=null;
+ try{
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  const now=local(),row=await cloud();
+  if(stable(now)!==stable(preparedMobileNaksh.before))throw Error('Phone changed since preview. Run 4A again.');
+  if(!row||row.updated_at!==preparedMobileNaksh.cloud.updated_at||
+     stable(row.payload)!==stable(preparedMobileNaksh.cloud.payload))
+    throw Error('Cloud changed since preview. Run 4A again.');
+  verifiedMobileNakshAlignment(now,row.payload);
+  // No Cloud write, and no locally new records can be lost: compare verified.
+  await setCurrent(row.payload);
+  const checked=local();
+  if(stable(checked)!==stable(row.payload))
+    throw Error('Mobile saved data did not match Cloud. Stop using ERP and check backup.');
+  role('mobile');
+  await markSynced(row.payload,row.updated_at);
+  paused=false;online=true;start();
+  preparedMobileNaksh=null;
+  const apply=$('axMobileNakshApply');if(apply)apply.disabled=true;
+  status('✓ VERIFIED: Mobile NAKSH Invoice 004 matches Cloud. Pragna 003 protected. Mobile + Laptop two-way Sync ON; no Cloud overwrite.');
+ }catch(e){
+  preparedMobileNaksh=null;
+  const apply=$('axMobileNakshApply');if(apply)apply.disabled=true;
+  status('⚠ Mobile alignment stopped: '+e.message+'. Keep both backups; no Cloud write was attempted.');
+ }finally{busy=false}
+}
 async function join(){
  if(!session)return status('Sign in first.');
  if(busy)return status('Another sync operation is in progress. Wait a moment.');
@@ -556,7 +661,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:9999;bottom:70px;right:12px;width:min(390px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px">Only use on the device holding the unsent NAKSH Invoice 003. This keeps the Pragna 003 voucher and renumbers only NAKSH to 004.</p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview">4A. Backup + Preview Mobile 003 to 004</button><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -567,6 +672,8 @@ function panel(){
  $('ax2Repair').onclick=repairOldCloud;
  $('axNakshPrepare').onclick=prepareNakshRepair;
  $('axNakshApply').onclick=applyNakshRepair;
+ $('axMobileNakshPreview').onclick=prepareMobileNaksh;
+ $('axMobileNakshApply').onclick=applyMobileNaksh;
  status(lastMessage);
 }
 function init(){
