@@ -598,6 +598,218 @@ async function applyMobileNaksh(){
   status('⚠ Mobile alignment stopped: '+e.message+'. Keep both backups; no Cloud write was attempted.');
  }finally{busy=false}
 }
+/* Guided reconciliation, 2026-11-17.
+ * Owner confirmed BOTH versions of Quotation AFX/QTN/003 are WRONG.
+ * Preserve both originals with immutable audit copies; reserve number 003
+ * as VOID, keeping historical invoices and all company data.
+ */
+let pendingBothWrongQuotes=null;
+function buildBothWrongQuotesMerge(mobile,remote){
+ const mine=clone(mobile),cloudData=clone(remote),result=clone(remote);
+ const idFor=k=>k==='quotations'?'quotationNo':k==='parties'?'gstin':k==='commissionAgents'?'id':k==='workOrders'?'workNo':'documentNo';
+ function asMap(data,k){
+  const xs=Array.isArray(data[k])?data[k]:[];
+  const f=idFor(k),out=new Map();
+  for(const v of xs){
+   const id=String(v?.[f]||'').trim().toUpperCase();
+   if(!id||out.has(id))throw Error('Missing or duplicated '+k+' identifier '+(id||'(blank)')+'. Check both backups.');
+   out.set(id,v);
+  }
+  return out;
+ }
+ // Unrecognized changes must never be silently discarded.
+ const special=new Set(['quotations','parties','salesOrders','workOrders','challans','invoices','vouchers','products','commissionAgents','invoiceCommissionLedger','reconciliationArchive','reservedDocumentNumbers']);
+ for(const k of new Set([...Object.keys(mine),...Object.keys(cloudData)])){
+  if(special.has(k))continue;
+  if(stable(mine[k])!==stable(cloudData[k]))
+   throw Error('Unsynced changes in '+k+'. No automatic selection; review backups.');
+ }
+ const archive=Array.isArray(result.reconciliationArchive)?result.reconciliationArchive.slice():[];
+ const tag='AEROVEX-2026-11-17-QTN003-BOTH-INVALID';
+ if(archive.some(x=>x.auditId===tag))throw Error('Wrong QTN/003 review has already been archived. Recheck Cloud.');
+ const storeVariant=(type,number,origin,record,statusText)=>{
+  archive.push({auditId:tag,source:origin,module:type,number,reason:statusText,
+    status:type==='quotations'?'INVALID_CONFIRMED':'REVIEW_PENDING',
+    archivedAt:new Date().toISOString(),original:clone(record)});
+ };
+ function compareUnchanged(k,except){
+  const a=asMap(mine,k),b=asMap(cloudData,k);
+  for(const [id,entry] of a){
+   if(except.has(id))continue;
+   if(!b.has(id)||stable(entry)!==stable(b.get(id)))throw Error(k+' '+id+' differs outside approved conflict list. Preserve backup and review.');
+  }
+  for(const [id] of b){if(except.has(id))continue;if(!a.has(id))throw Error(k+' '+id+' is absent on Phone. No safe merge until reviewed.');}
+  return [a,b];
+ }
+ const [mobileQuotes,remoteQuotes]=compareUnchanged('quotations',new Set(['AFX/QTN/003']));
+ const qPhone=mobileQuotes.get('AFX/QTN/003'),qCloud=remoteQuotes.get('AFX/QTN/003');
+ if(!qPhone||!qCloud)throw Error('Both conflicting quotation versions must exist before they can be voided.');
+ storeVariant('quotations','AFX/QTN/003','MOBILE',qPhone,'User confirmed BOTH QTN/003 versions were wrong.');
+ storeVariant('quotations','AFX/QTN/003','CLOUD_PC',qCloud,'User confirmed BOTH QTN/003 versions were wrong.');
+ result.quotations=(result.quotations||[]).map(q=>q.quotationNo!=='AFX/QTN/003'?q:{
+   quotationNo:'AFX/QTN/003',date:'2026-11-17',party:'VOID — INVALID DOCUMENT NUMBER',
+   status:'VOID',voided:true,reason:'Both device quotation versions incorrect; originals in Reconciliation Archive',
+   taxable:0,gst:0,total:0,items:[]});
+ // Keep the original number reserved; NEVER auto-reissue this invalid 003.
+ result.reservedDocumentNumbers=[...new Set([...(cloudData.reservedDocumentNumbers||[]),'AFX/QTN/003'])];
+ const [mobileSO,remoteSO]=compareUnchanged('salesOrders',new Set(['AFX/SO/004']));
+ const [mobileDC,remoteDC]=compareUnchanged('challans',new Set(['AFX/DC/004','AFX/DC/001']));
+ if(mobileDC.has('AFX/DC/001'))throw Error('Cloud DC001 must be safely retained; unexpected Phone DC001 exists.');
+ const [mobileWO,remoteWO]=compareUnchanged('workOrders',new Set(['AFX-WO-0008']));
+ if(mobileWO.has('AFX-WO-0008')||!remoteWO.has('AFX-WO-0008'))
+  throw Error('Work order 0008 identity unexpected. Verify records.');
+ const mSO=mobileSO.get('AFX/SO/004'),cSO=remoteSO.get('AFX/SO/004');
+ const mDC=mobileDC.get('AFX/DC/004'),cDC=remoteDC.get('AFX/DC/004');
+ if(!mSO||!cSO||!mDC||!cDC)throw Error('NAKSH Order/Challan missing from device or Cloud.');
+ const sameGoods=(a,b)=>a?.party==='NAKSH ENTERPRISE'&&b?.party==='NAKSH ENTERPRISE'&&
+   String(a.gstin)==='24AAUFN6527B1Z7'&&String(b.gstin)==='24AAUFN6527B1Z7'&&
+   Number(a.total)===13765.5&&Number(b.total)===13765.5&&
+   a.items?.length===1&&b.items?.length===1&&
+   Number(a.items[0].qty)===46&&Number(b.items[0].qty)===46&&
+   Number(a.items[0].rate)===285&&Number(b.items[0].rate)===285&&
+   String(a.items[0].hsn)==='59119090'&&String(b.items[0].hsn)==='59119090';
+ if(!sameGoods(mSO,cSO)||!sameGoods(mDC,cDC))
+  throw Error('NAKSH Order or Challan business values differ. Never silently merge tax or quantities.');
+ if(stable(mSO)!==stable(cSO))storeVariant('salesOrders','AFX/SO/004','MOBILE',mSO,'Mobile description/terms differ from current Cloud. Review later before reprinting.');
+ if(stable(mDC)!==stable(cDC))storeVariant('challans','AFX/DC/004','MOBILE',mDC,'Mobile dispatch terms differ from current Cloud. Review later before reprinting.');
+ // Existing official cloud invoice 004 is retained; mobile unsent 003
+ // is the same commercial transaction with different display fields.
+ const [mobileInvoice,remoteInvoice]=compareUnchanged('invoices',new Set(['AFX/INV/003','AFX/INV/004']));
+ const mInv=mobileInvoice.get('AFX/INV/003'),cInv=remoteInvoice.get('AFX/INV/004');
+ if(!mInv||!cInv||mobileInvoice.has('AFX/INV/004')||remoteInvoice.has('AFX/INV/003')||
+    !sameGoods(mInv,cInv)||
+    mInv.sourceChallan!=='AFX/DC/004'||cInv.sourceChallan!=='AFX/DC/004')
+  throw Error('Invoice 003/004 cannot be verified as the same unsent NAKSH transaction.');
+ storeVariant('invoices','AFX/INV/003','MOBILE',mInv,'Unsent phone draft; retained for audit. Live invoice 004 from Cloud stays authoritative.');
+ // Preserve all existing distinct sales vouchers, including Pragna 003.
+ const voucherId=v=>[v.type,v.no,v.date,v.party].join('|').toUpperCase();
+ const vouchers=(cloudData.vouchers||[]).map(v=>[voucherId(v),v]),vmap=new Map(vouchers);
+ if(vmap.size!==vouchers.length)throw Error('Duplicate Cloud voucher IDs exist; stop.');
+ for(const v of mine.vouchers||[]){
+  if(v.type==='Sales'&&v.no==='AFX/INV/003'&&v.party==='NAKSH ENTERPRISE'){
+   if(Number(v.debit)!==13765.5||!vmap.has('SALES|AFX/INV/004|2026-11-17|NAKSH ENTERPRISE'))
+    throw Error('NAKSH Voucher does not match current Cloud 004.');
+   storeVariant('vouchers','AFX/INV/003','MOBILE',v,'Unsent phone voucher 003 archived; matching official Cloud 004 kept.');
+  }else{
+   const key=voucherId(v);if(!vmap.has(key)||stable(vmap.get(key))!==stable(v))
+    throw Error('Voucher '+key+' differs or was not found in Cloud.');
+  }
+ }
+ if((mine.vouchers||[]).length!==vouchers.length||!vmap.has('SALES|AFX/INV/003|2026-10-20|PRAGNA DYECHEM PRIVATE LIMITED'))
+  throw Error('Existing Pragna voucher 003 was not verified. Refusing merge.');
+ const [mobileParties,remoteParties]=[asMap(mine,'parties'),asMap(cloudData,'parties')];
+ if(mobileParties.size!==remoteParties.size)throw Error('Customer count differs. Review first.');
+ for(const [key,v] of mobileParties){
+  if(!remoteParties.has(key))throw Error('Local-only Customer '+key+' requires review.');
+  if(stable(v)!==stable(remoteParties.get(key)))storeVariant('parties',key,'MOBILE',v,'Mobile customer details differed; Cloud master retained pending review.');
+ }
+ // Product master exists in Cloud. Do not discard local-only product data.
+ const [mobileProd,remoteProd]=[asMap(mine,'products'),asMap(cloudData,'products')];
+ for(const [key,p] of mobileProd){
+  if(remoteProd.has(key)){if(stable(p)!==stable(remoteProd.get(key)))throw Error('Product '+key+' conflict');}
+  else result.products.push(p);
+ }
+ const [mobileAgents,remoteAgents]=[asMap(mine,'commissionAgents'),asMap(cloudData,'commissionAgents')];
+ for(const [key,v] of mobileAgents){
+  if(remoteAgents.has(key)){
+   const cv=remoteAgents.get(key);
+   const a=clone(v),b=clone(cv);delete a.createdAt;delete b.createdAt;
+   if(stable(a)!==stable(b))throw Error('Commission agent '+key+' has substantive conflicts.');
+   if(stable(v)!==stable(cv))storeVariant('commissionAgents',key,'MOBILE',v,'Agent createdAt differs; Cloud master retained.');
+  }else result.commissionAgents.push(v);
+ }
+ const cloudCost=cloudData.invoiceCommissionLedger||{},mobileCost=mine.invoiceCommissionLedger||{};
+ const costs={...clone(cloudCost)};
+ for(const [key,value] of Object.entries(mobileCost)){
+  if(Object.hasOwn(costs,key)&&stable(costs[key])!==stable(value))
+   throw Error('Commission costing '+key+' conflicts. Do not overwrite.');
+  costs[key]=clone(value);
+ }
+ result.invoiceCommissionLedger=costs;
+ result.reconciliationArchive=archive;
+ // Ensure every invalid version and all other valid documents remain accessible.
+ if(result.quotations.length!==cloudData.quotations.length||result.invoices.length!==cloudData.invoices.length||
+  result.challans.length!==cloudData.challans.length||result.workOrders.length!==cloudData.workOrders.length||
+  !(result.vouchers||[]).some(v=>v.no==='AFX/INV/003'&&/Pragna/i.test(v.party||''))||
+  !(result.invoices||[]).some(v=>v.documentNo==='AFX/INV/004'&&v.party==='NAKSH ENTERPRISE')||
+  !(result.invoiceCommissionLedger||{})['AFX/INV/001']||
+  archive.filter(x=>x.module==='quotations'&&x.status==='INVALID_CONFIRMED').length!==2)
+  throw Error('Post-merge validation failed; no original business documents were deleted.');
+ return result;
+}
+function exportBothWrongQuotePlan(item){
+ const body={
+  application:'Aerovex ERP',kind:'PRE-RECONCILIATION TWO-DEVICE SAFETY BACKUP',
+  exportedAt:new Date().toISOString(),confirmed:'Both versions of AFX/QTN/003 are incorrect.',
+  phoneOriginal:item.phoneBefore,cloudOriginal:{updated_at:item.cloudBefore.updated_at,payload:item.cloudBefore.payload},
+  proposedMerged:item.merged,important:'Both invalid QTN/003 copies stay in reconciliationArchive; phone-only differences stay in audit; LIVE Cloud 004 and Pragna voucher 003 remain unchanged.'
+ };
+ const url=URL.createObjectURL(new Blob([JSON.stringify(body)],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='Aerovex-BOTH-WRONG-QTN003-SAFETY-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+async function prepareBothWrongQuoteRepair(){
+ const x=$('axInvalidQuoteStatus');
+ const inform=msg=>{status(msg);if(x)x.textContent=msg;};
+ if(!session){await boot();if(!session)return inform('Sign in as Owner first. No records changed.');}
+ if(busy)return inform('Another Sync operation is running. Retry later.');
+ pendingBothWrongQuotes=null;
+ const apply=$('axInvalidQuoteApply');if(apply)apply.disabled=true;
+ busy=true;
+ try{
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  const localBefore=local(),remote=await cloud();
+  if(!remote)throw Error('Cloud unavailable. Retry without clearing browser data.');
+  const merged=buildBothWrongQuotesMerge(localBefore,remote.payload);
+  const plan={phoneBefore:localBefore,cloudBefore:remote,merged};
+  exportBothWrongQuotePlan(plan);
+  pendingBothWrongQuotes=plan;
+  if(apply)apply.disabled=false;
+  inform('✓ 5A SAFE PREVIEW: Both incorrect QTN003 versions archived, number 003 reserved, NAKSH Invoice 004 retained, Pragna voucher 003 retained; cost ledger preserved. Backup JSON download requested. Confirm it is in Downloads before 5B. NO CHANGES YET.');
+ }catch(e){inform('⚠ 5A BLOCKED: '+e.message+'. No data changed. Send a new backup if needed.')}
+ finally{busy=false}
+}
+async function applyBothWrongQuoteRepair(){
+ const x=$('axInvalidQuoteStatus'),inform=msg=>{status(msg);if(x)x.textContent=msg;};
+ if(!session||!pendingBothWrongQuotes)return inform('Run 5A and save the safety backup first.');
+ if(busy)return inform('Sync is busy; please wait.');
+ if(!confirm('I CONFIRM that the new BOTH-WRONG-QTN003 SAFETY JSON exists in Downloads, and BOTH QTN/003 records are invalid. Preserve both originals in archive, mark number 003 VOID, keep invoice 004, Cloud Pragna voucher 003 and mobile Commission Costing data. Sync PC + Phone with this verified result?'))
+  return inform('Cancelled: no data was changed.');
+ busy=true;paused=true;online=false;clearInterval(timer);timer=null;
+ const plan=pendingBothWrongQuotes;
+ try{
+  if(window.axERPStorageBridge)await window.axERPStorageBridge.flush();
+  const device=local(),latest=await cloud();
+  if(stable(device)!==stable(plan.phoneBefore))throw Error('Phone changed since 5A. Prepare a new safety backup.');
+  if(!latest||latest.updated_at!==plan.cloudBefore.updated_at||
+    stable(latest.payload)!==stable(plan.cloudBefore.payload))
+   throw Error('Cloud changed since 5A. Run 5A again to avoid overwriting new entries.');
+  const verifiedPlan=buildBothWrongQuotesMerge(device,latest.payload);
+  // Archive timestamps only are different after second run; compare all
+  // business sections, then use the new fully validated merged payload.
+  if(stable(verifiedPlan.quotations)!==stable(plan.merged.quotations)||
+     stable(verifiedPlan.invoices)!==stable(plan.merged.invoices))
+   throw Error('A quotation/invoice changed. Nothing written.');
+  const where='/rest/v1/erp_snapshots?user_id=eq.'+encodeURIComponent(session.user.id)+
+    '&updated_at=eq.'+encodeURIComponent(latest.updated_at)+'&select=updated_at';
+  const response=await send(where,'PATCH',{payload:verifiedPlan,updated_at:new Date().toISOString()},{Prefer:'return=representation'});
+  if(!Array.isArray(response)||response.length!==1)
+   throw Error('Cloud changed during safe merge. Read status before retrying.');
+  const readback=await cloud();
+  if(!readback||stable(readback.payload)!==stable(verifiedPlan))
+   throw Error('Cloud read-back differs. Do not repeat. Saved backups are retained.');
+  await setCurrent(verifiedPlan);
+  await markSynced(verifiedPlan,readback.updated_at);
+  role(IS_MOBILE?'mobile':'pc');
+  paused=false;online=true;start();pendingBothWrongQuotes=null;
+  if($('axInvalidQuoteApply'))$('axInvalidQuoteApply').disabled=true;
+  inform('✓ VERIFIED SYNC: both INVALID QTN003 versions archived as VOID, NAKSH Invoice 004 and Pragna voucher 003 preserved, commission costing included. Cloud + this Device match. Two-way Sync ON. Review archived alternative customer/order details later.');
+ }catch(e){
+  inform('⚠ APPLY STOPPED: '+e.message+'. Keep both JSON backups. No automatic retry or second invoice.');
+  pendingBothWrongQuotes=null;if($('axInvalidQuoteApply'))$('axInvalidQuoteApply').disabled=true;
+ }finally{busy=false}
+}
 async function join(){
  if(!session)return status('Sign in first.');
  if(busy)return status('Another sync operation is in progress. Wait a moment.');
@@ -713,7 +925,7 @@ async function boot(){
 function panel(){
  let p=$('axCloudPanel');if(p){p.remove();return}
  p=document.createElement('section');p.id='axCloudPanel';p.style.cssText='position:fixed;z-index:2147483200;bottom:8px;right:8px;width:min(425px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;pointer-events:auto;background:white;color:#133d50;padding:16px;border-radius:12px;border:2px solid #1780a6;box-shadow:0 10px 35px #0004;font:14px Arial';
- p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status" style="position:sticky;top:0;z-index:2;background:#eff8fb;color:#12435b;border:1px solid #bfd6df;border-radius:7px;padding:10px;overflow-wrap:anywhere">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview" style="display:block;width:100%;font-weight:700;font-size:15px;color:#fff;background:#0b607c;border:0;border-radius:8px;padding:15px;min-height:54px;touch-action:manipulation;cursor:pointer">4A. Backup + Preview Mobile 003 to 004</button><p id="axMobileNakshFeedback" role="status" aria-live="polite" style="display:none;border:1px solid #9cbece;border-radius:7px;padding:12px;background:#eff8fb;font-weight:700;overflow-wrap:anywhere"></p><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
+ p.innerHTML='<button type="button" id="ax2Close" style="float:right">✕</button><h3>Aerovex Cloud Sync — Mobile + PC Only</h3><p id="ax2Badge" style="font-weight:bold">○ Sync Not Ready</p><p id="ax2Status" role="status" style="position:sticky;top:0;z-index:2;background:#eff8fb;color:#12435b;border:1px solid #bfd6df;border-radius:7px;padding:10px;overflow-wrap:anywhere">Not connected</p><p>One shared Aerovex data set with editing on BOTH mobile and laptop. Sync checks every 8 seconds when online and paired.</p><input type="password" id="ax2Password" autocomplete="current-password" placeholder="Existing Aerovex admin password" style="padding:10px;width:95%;box-sizing:border-box"><button type="button" id="ax2Login">1. Sign in as Owner</button><hr><p><button type="button" id="ax2Backup">Download This Device Backup</button></p><p><b>First time (only after both device backups):</b></p><button type="button" id="ax2Init">2A. Initialize Cloud (ONLY IF EMPTY)</button><p><button type="button" id="ax2Join">2B. Connect / Join Device (Mobile + Laptop)</button></p><button type="button" id="ax2Resume">Resume / Verify Auto Sync</button><p><button type="button" id="ax2Repair">MOBILE ONLY: Review / Repair Old Cloud Backup</button><hr><p><b>Specific NAKSH Invoice 003 Conflict Repair</b></p><button type="button" id="axNakshPrepare" style="display:none">3A. Download Safe Merge Backup + Preview</button><p><button type="button" id="axNakshApply" style="display:none" disabled>3B. Apply Verified NAKSH Repair</button></p><p style="font-size:12px"><b>Cloud already has NAKSH 004.</b> On mobile only, use the new 4A/4B steps below. Laptop Invoice 004 stays unchanged.</p><hr><p><b>Mobile 003 → Verified Cloud 004</b></p><button type="button" id="axMobileNakshPreview" style="display:block;width:100%;font-weight:700;font-size:15px;color:#fff;background:#0b607c;border:0;border-radius:8px;padding:15px;min-height:54px;touch-action:manipulation;cursor:pointer">4A. Backup + Preview Mobile 003 to 004</button><p id="axMobileNakshFeedback" role="status" aria-live="polite" style="display:none;border:1px solid #9cbece;border-radius:7px;padding:12px;background:#eff8fb;font-weight:700;overflow-wrap:anywhere"></p><p><button type="button" id="axMobileNakshApply" disabled>4B. Apply Verified Mobile Alignment</button></p><hr><p><b>Both AFX/QTN/003 Quotations are INVALID — Safe Reconciliation</b></p><p>Keep BOTH wrong quotations in audit archive, keep number 003 reserved, preserve NAKSH Invoice 004 and mobile costing. Preview first, then approve.</p><button type="button" id="axInvalidQuotePrepare" style="width:100%;font-weight:700;padding:14px;min-height:52px">5A. Backup + Preview Both Wrong QTN003</button><p id="axInvalidQuoteStatus" role="status" aria-live="polite" style="padding:8px;background:#eaf3f9;overflow-wrap:anywhere"></p><button type="button" id="axInvalidQuoteApply" disabled style="width:100%;padding:14px;min-height:50px">5B. Apply Verified Full Reconciliation</button></p></p><p style="font-size:12px;color:#a14320"><b>Safety:</b> Never restores/overwrites cloud automatically. Different new entries merge; same-record edits or duplicate numbers pause sync. No silent record deletion. Keep both backups. Do not use the setup buttons on a third device.</p>';
  document.body.appendChild(p);
  $('ax2Close').onclick=()=>p.remove();
  $('ax2Login').onclick=auth;
@@ -726,6 +938,8 @@ function panel(){
  $('axNakshApply').onclick=applyNakshRepair;
  $('axMobileNakshPreview').onclick=()=>{const fb=$('axMobileNakshFeedback');if(fb){fb.style.display='block';fb.textContent='4A button pressed — checking Cloud and phone…';}prepareMobileNaksh().catch(e=>{const msg='4A failed: '+(e?.message||e);status(msg);if(fb)fb.textContent=msg;});};
  $('axMobileNakshApply').onclick=applyMobileNaksh;
+ $('axInvalidQuotePrepare').onclick=prepareBothWrongQuoteRepair;
+ $('axInvalidQuoteApply').onclick=applyBothWrongQuoteRepair;
  status(lastMessage);
 }
 function init(){
